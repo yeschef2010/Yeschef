@@ -1,0 +1,538 @@
+'use client';
+import { useState } from 'react';
+import { FOOD_AREAS, MEALS, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
+import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
+
+/* ---------- Welcome ---------- */
+export function Welcome({ onTour, onSkip }) {
+  return (
+    <div className="screen" style={{ justifyContent: 'space-between', paddingTop: 56 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <Logo width={220} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <h1 className="h1">
+            Hi Chef<span className="dot">!</span>
+          </h1>
+          <p className="lead">I'm your kitchen assistant. You cook, I'll handle the admin: what's in, what needs using up, and what to buy.</p>
+          <p className="lead">First, give me a quick tour of your kitchen. It takes about five minutes.</p>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <button className="btn" onClick={onTour}>
+          Show me around your kitchen
+        </button>
+        <button className="btn quiet" onClick={onSkip}>
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Main meal screen ---------- */
+export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, showUseUp }) {
+  const meal = MEALS[mealKey];
+  const urgent = stock.filter((s) => s.area !== 'Spice rack' && needsAttention(s) && !s.status);
+  const empty = stock.length === 0;
+
+  return (
+    <div className="screen" style={{ paddingTop: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
+        <p className="small" style={{ fontWeight: 700 }}>
+          {dateText}
+        </p>
+        <h2 className="h2" style={{ fontSize: 32 }}>
+          {meal.greeting}
+          <span className="dot">.</span>
+        </h2>
+      </div>
+
+      {banner && (
+        <div className="card green tight">
+          <p style={{ fontSize: 15, lineHeight: 1.45 }}>{banner}</p>
+        </div>
+      )}
+
+      {empty ? (
+        <div className="card">
+          <p className="h3">Let's see what you've got</p>
+          <p className="sub">I need to know what's in your kitchen before I can suggest anything. A quick tour takes about five minutes.</p>
+          <button className="btn" onClick={onTour}>
+            Start the kitchen tour
+          </button>
+        </div>
+      ) : (
+        <>
+          {showUseUp && urgent.length > 0 && (
+            <div className="card orange tight">
+              <p className="eyebrow orange">Use it up</p>
+              <p style={{ fontSize: 16, lineHeight: 1.45 }}>
+                Your {listJoin(urgent.slice(0, 3).map((u) => u.name))} {urgent.length === 1 ? 'needs' : 'need'} using soon. I'll plan around {urgent.length === 1 ? 'it' : 'them'}.
+              </p>
+            </div>
+          )}
+
+          <div className="seg" role="group" aria-label="How much time have you got?">
+            <button aria-pressed={mode === 'quick'} onClick={() => setMode('quick')}>
+              Quick and easy
+            </button>
+            <button aria-pressed={mode === 'fun'} onClick={() => setMode('fun')}>
+              Fun in the kitchen
+            </button>
+          </div>
+
+          <div className="card" style={{ borderRadius: 20, padding: 18, gap: 12 }}>
+            {ideaState === 'loading' && (
+              <div className="row" style={{ minHeight: 120, justifyContent: 'center' }}>
+                <div className="spinner" />
+                <p className="sub">Thinking up {meal.tab.toLowerCase()}…</p>
+              </div>
+            )}
+            {ideaState === 'error' && (
+              <>
+                <p className="error">{ideaError}</p>
+                <button className="btn sm" onClick={onGetIdea}>
+                  Try again
+                </button>
+              </>
+            )}
+            {ideaState === 'idle' && !idea && (
+              <>
+                <p className="h3">Ready when you are</p>
+                <button className="btn" onClick={onGetIdea}>
+                  Get a {meal.tab.toLowerCase()} idea
+                </button>
+              </>
+            )}
+            {ideaState === 'idle' && idea && (
+              <>
+                <p className="eyebrow">
+                  {meal.tab}
+                  {idea.time ? ` · ${idea.time}` : ''}
+                </p>
+                <h3 className="h3" style={{ fontSize: 24 }}>
+                  {idea.title}
+                </h3>
+                {idea.tag && <p className="sub" style={{ color: '#C9D2CC' }}>{idea.tag}</p>}
+                {idea.why && <p style={{ fontSize: 15, lineHeight: 1.45, color: '#C9D2CC' }}>{idea.why}</p>}
+                {idea.missing && idea.missing.length > 0 && (
+                  <div className="row" style={{ alignItems: 'flex-start', background: '#141B17', borderRadius: 12, padding: 12 }}>
+                    <Bag />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                      <p style={{ fontSize: 14, lineHeight: 1.45, color: '#C9D2CC' }}>
+                        <strong style={{ color: '#fff' }}>Grab: {listJoin(idea.missing.map((m) => m.toLowerCase()))}.</strong>
+                      </p>
+                      <button className="btn sm ghost" style={{ height: 36, alignSelf: 'flex-start' }} onClick={() => onAddToList(idea.missing)}>
+                        Add to shopping list
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <button className="btn" onClick={onCook}>
+                  Let's cook
+                </button>
+                <button className="btn quiet sm" onClick={onAnother}>
+                  Another idea
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Recipe ---------- */
+export function Recipe({ idea, onBack, onCooked, onAddToList }) {
+  if (!idea) return null;
+  return (
+    <div className="screen">
+      <button className="icon-btn" onClick={onBack} aria-label="Back">
+        <Back />
+      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <h2 className="h2" style={{ fontSize: 28 }}>
+          {idea.title}
+        </h2>
+        <p className="sub">{[idea.time, idea.tag].filter(Boolean).join(' · ')}</p>
+      </div>
+      {idea.tip && (
+        <div className="card orange tight">
+          <p style={{ fontSize: 15, lineHeight: 1.45 }}>
+            <strong style={{ color: '#F3A86E' }}>Heads up:</strong> {idea.tip}
+          </p>
+        </div>
+      )}
+      <div>
+        <p className="eyebrow" style={{ marginBottom: 4 }}>
+          Ingredients
+        </p>
+        {idea.ingredients.map((ing, i) => (
+          <div className="list-row" key={i}>
+            <p style={{ fontSize: 16 }}>
+              {ing.name}
+              {ing.amount ? <span style={{ color: '#AEB8B1' }}> · {ing.amount}</span> : null}
+            </p>
+            <span className={`pill tag ${ing.inStock ? 'fine' : 'urgent'}`} style={{ alignSelf: 'center' }}>
+              {ing.inStock ? 'In stock' : 'Grab one'}
+            </span>
+          </div>
+        ))}
+      </div>
+      {idea.missing && idea.missing.length > 0 && (
+        <button className="btn sm ghost" onClick={() => onAddToList(idea.missing)}>
+          Add missing to shopping list
+        </button>
+      )}
+      <div className="steps">
+        <p className="eyebrow">Method</p>
+        {idea.steps.map((s, i) => (
+          <div className="step" key={i}>
+            <span className="n">{i + 1}</span>
+            <p>{s}</p>
+          </div>
+        ))}
+      </div>
+      <button className="btn" onClick={onCooked}>
+        Cooked it, update my kitchen
+      </button>
+    </div>
+  );
+}
+
+/* ---------- Edit sheet ---------- */
+export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
+  const [name, setName] = useState(item.name);
+  const [qty, setQty] = useState(isKit ? item.note || '' : item.qty || '');
+  const [area, setArea] = useState(item.area || 'Fridge');
+  const [status, setStatus] = useState(item.status || '');
+  const [days, setDays] = useState(() => {
+    const d = daysLeft(item);
+    return d == null ? '' : String(Math.max(0, d));
+  });
+
+  function save() {
+    if (isKit) return onSave({ ...item, name: name.trim() || item.name, note: qty });
+    const d = days === '' ? null : Math.max(0, parseInt(days, 10) || 0);
+    onSave({
+      ...item,
+      name: name.trim() || item.name,
+      qty,
+      area,
+      status: status || null,
+      shelfDays: d,
+      addedAt: Date.now(),
+    });
+  }
+
+  return (
+    <div className="overlay">
+      <button className="backdrop" aria-label="Close" onClick={onClose} />
+      <div className="sheet" role="dialog" aria-label={`Edit ${item.name}`}>
+        <div className="row between">
+          <p className="h3">Edit</p>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <Close />
+          </button>
+        </div>
+        <label className="lbl" htmlFor="ed-name">Name</label>
+        <input id="ed-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <label className="lbl" htmlFor="ed-qty">{isKit ? 'Note' : 'How much'}</label>
+        <input id="ed-qty" className="input" value={qty} onChange={(e) => setQty(e.target.value)} />
+        {!isKit && (
+          <>
+            <div className="row">
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="lbl" htmlFor="ed-area">Where</label>
+                <select id="ed-area" className="input" value={area} onChange={(e) => setArea(e.target.value)}>
+                  {FOOD_AREAS.map((a) => (
+                    <option key={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="lbl" htmlFor="ed-days">Use within (days)</label>
+                <input id="ed-days" className="input" inputMode="numeric" placeholder="Keeps" value={days} onChange={(e) => setDays(e.target.value.replace(/[^0-9]/g, ''))} />
+              </div>
+            </div>
+            <label className="lbl" htmlFor="ed-status">Stock level</label>
+            <select id="ed-status" className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">Plenty</option>
+              <option value="Low">Running low</option>
+              <option value="Out">Run out</option>
+            </select>
+          </>
+        )}
+        <div className="row">
+          <button className="btn ghost" style={{ flex: 1 }} onClick={() => onRemove(item.id)}>
+            {isKit ? 'Remove' : 'Used it up'}
+          </button>
+          <button className="btn" style={{ flex: 1 }} onClick={save}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Kitchen ---------- */
+export function Kitchen({ stock, onEdit, onAdd, onTour }) {
+  const [open, setOpen] = useState({ Fridge: true });
+  return (
+    <div className="screen" style={{ paddingTop: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
+        <h2 className="h2" style={{ fontSize: 32 }}>Your kitchen</h2>
+        <p className="sub">{stock.length} things logged. Tap one to change it.</p>
+      </div>
+      <div className="grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <button className="btn sm" onClick={onAdd}>Add food</button>
+        <button className="btn sm ghost" onClick={onTour}>Kitchen tour</button>
+      </div>
+      {FOOD_AREAS.map((area) => {
+        const items = stock.filter((s) => s.area === area);
+        const flagged = items.filter(needsAttention).length;
+        const isOpen = !!open[area];
+        return (
+          <div className="section" key={area}>
+            <button className="section-head" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [area]: !isOpen })}>
+              <span>{area}</span>
+              <span className={`meta${flagged ? ' alert' : ''}`}>
+                {flagged ? `${flagged} need attention` : `${items.length} ${items.length === 1 ? 'item' : 'items'}`}
+                <Chevron open={isOpen} />
+              </span>
+            </button>
+            {isOpen && (
+              <div className="section-body">
+                {items.length === 0 ? (
+                  <p className="sub" style={{ padding: '6px 8px 8px' }}>Nothing logged here yet.</p>
+                ) : (
+                  <div className="grid4">
+                    {items.map((it) => {
+                      const tag = stockTag(it);
+                      return (
+                        <button className="tile" key={it.id} onClick={() => onEdit(it)}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span className="name">{it.name}</span>
+                            <span className="qty">{it.qty}</span>
+                          </div>
+                          <span className={`tag ${tag.cls}`}>{tag.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {area === 'Spice rack' && <p className="sub" style={{ padding: '0 6px 4px' }}>Staples I assume you've always got: salt, pepper, cooking oil.</p>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- Shopping list ---------- */
+export function Shop({ list, setList, stock }) {
+  const [text, setText] = useState('');
+  const [copied, setCopied] = useState('');
+  const onList = new Set(list.map((l) => l.name.toLowerCase()));
+  const suggestions = stock.filter((s) => (s.status === 'Low' || s.status === 'Out') && !onList.has(s.name.toLowerCase()));
+
+  function add(name, why = '') {
+    const n = name.trim();
+    if (!n || onList.has(n.toLowerCase())) return;
+    setList([...list, { id: Math.random().toString(36).slice(2), name: n, why, done: false }]);
+  }
+
+  async function share() {
+    const textList = list.filter((l) => !l.done).map((l) => `- ${l.name}`).join('\n');
+    if (!textList) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Shopping list', text: textList });
+        return;
+      }
+      await navigator.clipboard.writeText(textList);
+      setCopied('Copied. Paste it into your supermarket app.');
+    } catch (e) {
+      // user cancelled
+    }
+  }
+
+  return (
+    <div className="screen" style={{ paddingTop: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
+        <h2 className="h2" style={{ fontSize: 32 }}>Next shop</h2>
+        <p className="sub">Everything you need, in one list.</p>
+      </div>
+
+      <div className="row">
+        <label htmlFor="shop-add" className="sr-only">Add to list</label>
+        <input id="shop-add" className="input" placeholder="Add something" value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { add(text); setText(''); } }} />
+        <button className="btn sm" onClick={() => { add(text); setText(''); }} disabled={!text.trim()}>Add</button>
+      </div>
+
+      {suggestions.length > 0 && (
+        <div className="card tight">
+          <p className="eyebrow orange">Running low</p>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+            {suggestions.map((s) => (
+              <button key={s.id} className="btn sm ghost" style={{ height: 36 }} onClick={() => add(s.name, 'Running low')}>
+                + {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {list.length === 0 ? (
+        <p className="sub">Your list is empty. Missing ingredients from recipes land here too.</p>
+      ) : (
+        <div>
+          {list.map((l) => (
+            <button key={l.id} className="check" aria-pressed={l.done}
+              onClick={() => setList(list.map((x) => (x.id === l.id ? { ...x, done: !x.done } : x)))}>
+              <span className="box">{l.done && <Tick />}</span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className="label" style={{ fontSize: 16, fontWeight: 700 }}>{l.name}</span>
+                {l.why && <span className="small">{l.why}</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {list.length > 0 && (
+        <div className="row">
+          <button className="btn ghost sm" style={{ flex: 1 }} onClick={() => setList(list.filter((l) => !l.done))}>Clear ticked</button>
+          <button className="btn sm" style={{ flex: 1 }} onClick={share}>Share list</button>
+        </div>
+      )}
+      {copied && <p className="sub">{copied}</p>}
+      <p className="small">Coming later: pick the cheapest supermarket and send the order straight to Tesco or Sainsbury's.</p>
+    </div>
+  );
+}
+
+/* ---------- Kit ---------- */
+export function Kit({ kit, onBack, onEdit, onAdd, onFilm }) {
+  const [text, setText] = useState('');
+  const [toast, setToast] = useState(false);
+  return (
+    <div className="screen">
+      <button className="icon-btn" onClick={onBack} aria-label="Back"><Back /></button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <h2 className="h2" style={{ fontSize: 32 }}>Your kit</h2>
+        <p className="sub">I only suggest recipes you can make with this. Tap one to change it.</p>
+      </div>
+      {kit.length > 0 ? (
+        <div className="grid4">
+          {kit.map((k) => (
+            <button className="tile plain" key={k.id} onClick={() => onEdit(k)} style={{ minHeight: 72 }}>
+              <span className="name">{k.name}</span>
+              <span className="qty">{k.note}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="sub">No kit logged yet.</p>
+      )}
+      <div className="row">
+        <label htmlFor="kit-add" className="sr-only">Add kit</label>
+        <input id="kit-add" className="input" placeholder="e.g. Air fryer" value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) { onAdd(text.trim()); setText(''); } }} />
+        <button className="btn sm" disabled={!text.trim()} onClick={() => { onAdd(text.trim()); setText(''); }}>Add</button>
+      </div>
+      <button className="btn ghost sm" onClick={onFilm}>Film my kit instead</button>
+      <div className="card orange tight">
+        <p className="eyebrow orange">Oven check</p>
+        <p style={{ fontSize: 15, lineHeight: 1.45 }}>Does your oven cook unevenly? The toast test finds the hot spots in five minutes.</p>
+        {toast && (
+          <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 15, lineHeight: 1.45 }}>
+            <li>Lay slices of bread across a baking tray.</li>
+            <li>Bake at 180°C for 5 minutes.</li>
+            <li>Look where it's darkest, then tap your oven above and add a note, e.g. "Runs hot on the left".</li>
+          </ol>
+        )}
+        <button className="btn sm" onClick={() => setToast(!toast)}>{toast ? 'Got it' : 'How to do the toast test'}</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Menu pages ---------- */
+export function Account({ profile, setProfile, onBack }) {
+  const field = (key, label, placeholder) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label className="lbl" htmlFor={`acc-${key}`}>{label}</label>
+      <input id={`acc-${key}`} className="input" placeholder={placeholder} value={profile[key] || ''} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} />
+    </div>
+  );
+  return (
+    <div className="screen">
+      <button className="icon-btn" onClick={onBack} aria-label="Back"><Back /></button>
+      <h2 className="h2" style={{ fontSize: 32 }}>Account</h2>
+      {field('name', 'Your name', 'Chef')}
+      {field('household', 'Who are you cooking for?', 'e.g. 2 adults, 2 kids')}
+      {field('dietary', 'Dietary needs or dislikes', 'e.g. no mushrooms, one veggie')}
+      <p className="sub">I use this to size recipes and steer clear of things you don't eat. It stays on this phone.</p>
+      <div className="card tight">
+        <p className="eyebrow">Linked supermarkets</p>
+        <p className="sub">Coming later: link Tesco and Sainsbury's so your orders update your kitchen automatically.</p>
+      </div>
+    </div>
+  );
+}
+
+export function Settings({ settings, setSettings, onReset, onBack }) {
+  const [confirm, setConfirm] = useState(false);
+  const toggle = (key, name, desc) => (
+    <div className="list-row">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <p style={{ fontSize: 16, fontWeight: 700 }}>{name}</p>
+        <p className="small">{desc}</p>
+      </div>
+      <button className="switch" aria-pressed={!!settings[key]} aria-label={name} onClick={() => setSettings({ ...settings, [key]: !settings[key] })}>
+        <span />
+      </button>
+    </div>
+  );
+  return (
+    <div className="screen">
+      <button className="icon-btn" onClick={onBack} aria-label="Back"><Back /></button>
+      <h2 className="h2" style={{ fontSize: 32 }}>Settings</h2>
+      <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+        {toggle('useUp', 'Use-it-up alerts', 'Flag food that needs eating soon')}
+        {toggle('autoIdea', 'Suggest meals automatically', 'An idea is ready when you open the app')}
+      </div>
+      <p className="small">Coming later: on-the-way-home nudges, calendar planning and health traffic lights.</p>
+      <div className="card tight">
+        <p style={{ fontSize: 16, fontWeight: 700 }}>Start again</p>
+        <p className="sub">Clears your kitchen, kit and shopping list from this phone.</p>
+        <button className="btn sm ghost" onClick={() => (confirm ? onReset() : setConfirm(true))}>
+          {confirm ? 'Tap again to clear everything' : 'Reset everything'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function About({ onBack }) {
+  return (
+    <div className="screen">
+      <button className="icon-btn" onClick={onBack} aria-label="Back"><Back /></button>
+      <h2 className="h2" style={{ fontSize: 32 }}>About</h2>
+      <Logo width={200} />
+      <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1 }}>
+        yes chef<span className="dot">!</span>
+      </p>
+      <p className="lead">You're the chef. We do the prep: what's in, what needs using up, and what to buy, so less goes in the bin and more stays in your pocket.</p>
+      <p className="small">Test version 0.1</p>
+    </div>
+  );
+}
+
+export { Pin };
