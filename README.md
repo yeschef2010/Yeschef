@@ -14,11 +14,19 @@ It's a [Next.js](https://nextjs.org) app, designed to be hosted on [Vercel](http
 
 Without the API key, the app still opens but can't read photos or suggest meals.
 
+### Shared kitchens (optional)
+
+To let a household share one kitchen across phones, add a database:
+
+1. In the Vercel project, open the **Storage** tab and create an **Upstash Redis** database (the free plan is fine), connected to this project.
+2. Redeploy. Then on one phone go to **Menu → Account → Start a shared kitchen** and tap **Invite someone**.
+
 ## How it works
 
 - `components/` holds the screens. Everything you log is saved on your phone (browser storage).
 - `app/api/scan` sends photos, video stills and your spoken or typed notes to Claude, which returns a tidy stock list.
 - `app/api/ideas` asks Claude for a meal idea from your stock, equipment and the time of day.
+- `app/api/household` stores a shared kitchen in Upstash Redis, so linked phones see the same stock, kit and shopping list.
 
 ## Local development
 

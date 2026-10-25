@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
+import { useHouseholdSync } from '@/lib/sync';
 import { FOOD_AREAS, MEALS, TOUR_STEPS, dateLine, daysLeft, mealForHour, todayKey } from '@/lib/helpers';
 import Tour from './Tour';
 import Found from './Found';
@@ -45,8 +46,30 @@ export default function App() {
   const [settings, setSettings] = usePersistentState('yc.settings', { useUp: true, autoIdea: true });
   const [shopList, setShopList] = usePersistentState('yc.shop', []);
   const [ideas, setIdeas] = usePersistentState('yc.ideas', {});
+  const [household, setHousehold] = usePersistentState('yc.household', null);
   const [mounted, setMounted] = useState(false);
+  const [joinPrefill, setJoinPrefill] = useState('');
   useEffect(() => setMounted(true), []);
+
+  const sync = useHouseholdSync({
+    code: household,
+    setCode: setHousehold,
+    mounted,
+    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList] },
+    profile,
+    setProfile,
+  });
+
+  // Opened from an invite link: ?join=CODE
+  useEffect(() => {
+    if (!mounted) return;
+    const j = new URLSearchParams(window.location.search).get('join');
+    if (j) {
+      setJoinPrefill(j);
+      setScreen('account');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [mounted]);
 
   const [screen, setScreen] = useState(null);
   const [tourSteps, setTourSteps] = useState(TOUR_STEPS);
@@ -210,6 +233,7 @@ export default function App() {
     setIdeas({});
     setProfile({ name: '', household: '', dietary: '' });
     setSettings({ useUp: true, autoIdea: true });
+    setHousehold(null);
     setOnboarded(false);
     setScreen('welcome');
   }
@@ -315,7 +339,21 @@ export default function App() {
         />
       )}
 
-      {current === 'account' && <Account profile={profile} setProfile={setProfile} onBack={go('home')} />}
+      {current === 'account' && (
+        <Account
+          profile={profile}
+          setProfile={setProfile}
+          onBack={go('home')}
+          household={household}
+          sync={sync}
+          joinPrefill={joinPrefill}
+          onJoined={() => {
+            setOnboarded(true);
+            setJoinPrefill('');
+            setIdeas({});
+          }}
+        />
+      )}
       {current === 'settings' && <Settings settings={settings} setSettings={setSettings} onReset={resetAll} onBack={go('home')} />}
       {current === 'about' && <About onBack={go('home')} />}
 

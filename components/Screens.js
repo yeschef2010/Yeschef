@@ -464,7 +464,80 @@ export function Kit({ kit, onBack, onEdit, onAdd, onFilm }) {
 }
 
 /* ---------- Menu pages ---------- */
-export function Account({ profile, setProfile, onBack }) {
+function HouseholdCard({ household, sync, joinPrefill, onJoined }) {
+  const [code, setCode] = useState(joinPrefill || '');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  async function run(fn) {
+    setBusy(true);
+    setErr('');
+    try {
+      await fn();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+
+  async function invite() {
+    const link = `${window.location.origin}/?join=${household}`;
+    const text = `Join our kitchen on Yes Chef! Open this link, then tap Add to Home Screen: ${link}  (or enter code ${household})`;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Yes Chef! invite', text });
+      else {
+        await navigator.clipboard.writeText(text);
+        setNote('Invite copied. Paste it into a message.');
+      }
+    } catch (e) {
+      // cancelled
+    }
+  }
+
+  if (household) {
+    const pretty = household.replace(/(.{4})/, '$1-');
+    return (
+      <div className="card">
+        <p className="eyebrow">Shared kitchen</p>
+        <p style={{ fontSize: 16, lineHeight: 1.45 }}>Everyone with this code sees the same stock, kit and shopping list.</p>
+        <p style={{ fontSize: 30, fontWeight: 700, letterSpacing: '0.08em' }}>{pretty}</p>
+        <p className="small">
+          {sync.status === 'error' ? sync.message : sync.status === 'syncing' ? 'Syncing…' : 'Up to date. Changes on other phones show within about 15 seconds.'}
+        </p>
+        <button className="btn sm" onClick={invite}>Invite someone</button>
+        {note && <p className="sub">{note}</p>}
+        <button className="btn sm ghost" onClick={() => (confirmLeave ? sync.leave() : setConfirmLeave(true))}>
+          {confirmLeave ? 'Tap again to stop sharing on this phone' : 'Leave shared kitchen'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <p className="eyebrow">Share your kitchen</p>
+      <p style={{ fontSize: 16, lineHeight: 1.45 }}>Link phones so everyone in the house sees the same stock and shopping list.</p>
+      <button className="btn sm" disabled={busy} onClick={() => run(async () => { await sync.create(); onJoined(); })}>
+        Start a shared kitchen
+      </button>
+      <p className="small" style={{ textAlign: 'center' }}>or join one you've been invited to</p>
+      <div className="row">
+        <label htmlFor="join-code" className="sr-only">Household code</label>
+        <input id="join-code" className="input" placeholder="Enter code" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} />
+        <button className="btn sm" disabled={busy || code.replace(/[^A-Za-z0-9]/g, '').length < 6} onClick={() => run(async () => { await sync.join(code); onJoined(); })}>
+          Join
+        </button>
+      </div>
+      <p className="small">Joining replaces this phone's kitchen with the shared one.</p>
+      {busy && <div className="spinner" />}
+      {err && <p className="error">{err}</p>}
+    </div>
+  );
+}
+
+export function Account({ profile, setProfile, onBack, household, sync, joinPrefill, onJoined }) {
   const field = (key, label, placeholder) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <label className="lbl" htmlFor={`acc-${key}`}>{label}</label>
@@ -475,10 +548,11 @@ export function Account({ profile, setProfile, onBack }) {
     <div className="screen">
       <button className="icon-btn" onClick={onBack} aria-label="Back"><Back /></button>
       <h2 className="h2" style={{ fontSize: 32 }}>Account</h2>
+      <HouseholdCard household={household} sync={sync} joinPrefill={joinPrefill} onJoined={onJoined} />
       {field('name', 'Your name', 'Chef')}
       {field('household', 'Who are you cooking for?', 'e.g. 2 adults, 2 kids')}
       {field('dietary', 'Dietary needs or dislikes', 'e.g. no mushrooms, one veggie')}
-      <p className="sub">I use this to size recipes and steer clear of things you don't eat. It stays on this phone.</p>
+      <p className="sub">I use this to size recipes and steer clear of things you don't eat.</p>
       <div className="card tight">
         <p className="eyebrow">Linked supermarkets</p>
         <p className="sub">Coming later: link Tesco and Sainsbury's so your orders update your kitchen automatically.</p>
