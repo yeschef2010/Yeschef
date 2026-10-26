@@ -33,7 +33,7 @@ export function Welcome({ onTour, onSkip }) {
 /* ---------- Main meal screen ---------- */
 export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, showUseUp }) {
   const meal = MEALS[mealKey];
-  const urgent = stock.filter((s) => s.area !== 'Spice rack' && needsAttention(s) && !s.status);
+  const urgent = stock.filter((s) => s.area !== 'Spice rack' && !s.status && stockTag(s).cls === 'red');
   const empty = stock.length === 0;
 
   return (
@@ -294,6 +294,12 @@ export function Kitchen({ stock, onEdit, onAdd, onTour }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
         <h2 className="h2" style={{ fontSize: 32 }}>Your kitchen</h2>
         <p className="sub">{stock.length} things logged. Tap one to change it.</p>
+      </div>
+      <div className="legend" aria-label="Colour key">
+        <span><i className="green" />Good</span>
+        <span><i className="amber" />Use soon</span>
+        <span><i className="red" />Check before use</span>
+        <span><i className="grey" />Keeps</span>
       </div>
       <div className="grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <button className="btn sm" onClick={onAdd}>Add food</button>

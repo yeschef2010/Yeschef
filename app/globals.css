@@ -264,7 +264,7 @@ label.lbl { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .line .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .line .name { font-size: 14px; font-weight: 700; line-height: 1.25; overflow-wrap: break-word; }
 .line .qty { font-size: 12px; line-height: 1.3; color: var(--muted); overflow-wrap: break-word; }
-.line .meta-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.line .meta-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; }
 .line .meta-row .tag { flex-shrink: 0; }
 .line-x {
   width: 32px; height: 40px; flex-shrink: 0; border: none; background: transparent; color: var(--muted);
@@ -272,3 +272,19 @@ label.lbl { font-size: 14px; font-weight: 700; color: var(--text-2); }
 }
 
 .sheet { max-height: 92dvh; overflow-y: auto; }
+
+/* Freshness traffic lights */
+.tag.green { background: #1F3D27; color: #8FD39A; }
+.tag.amber { background: #4A3414; color: #F5B85A; }
+.tag.red { background: #4A1F1C; color: #FF9F94; }
+.tag.grey { background: #2C3A31; color: #C9D2CC; }
+.tag.green::before, .tag.amber::before, .tag.red::before {
+  content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 4px; margin-right: 5px; vertical-align: 1px; background: currentColor;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 5px; display: inline-block; }
+.legend i.green { background: #8FD39A; }
+.legend i.amber { background: #F5B85A; }
+.legend i.red { background: #FF9F94; }
+.legend i.grey { background: #6B7A71; }
