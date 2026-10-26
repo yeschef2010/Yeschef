@@ -14,26 +14,28 @@ export default function ItemGroups({ items, area, onTap, onRemove, showTags = fa
             {g.items.map((it) => {
               const tag = showTags ? stockTag(it) : null;
               const sub = it.qty || it.note || it.status || '';
+              // The amount can be shortened with "…", but the days are always shown in full.
               const body = (
                 <span className="txt">
                   <span className="name">{it.name}</span>
                   {(sub || tag) && (
-                    <span className="meta-row">
-                      <span className="qty">{sub}</span>
-                      {tag && <span className={`tag ${tag.cls}`}>{tag.label}</span>}
+                    <span className="qty-row">
+                      {sub && <span className="qty">{sub}</span>}
+                      {tag && <span className="days">{sub ? ' · ' : ''}{tag.label}</span>}
                     </span>
                   )}
                 </span>
               );
+              const tone = tag ? ` tone-${tag.cls}` : '';
               if (onTap) {
                 return (
-                  <button key={it.id} className="line" onClick={() => onTap(it)}>
+                  <button key={it.id} className={`line${tone}`} onClick={() => onTap(it)} title={it.name}>
                     {body}
                   </button>
                 );
               }
               return (
-                <div key={it.id} className="line">
+                <div key={it.id} className={`line${tone}`} title={it.name}>
                   {body}
                   {onRemove && (
                     <button className="line-x" onClick={() => onRemove(it.id)} aria-label={`Remove ${it.name}`}>
