@@ -15,7 +15,7 @@ function lastWords(text, n = 2) {
   return words.length > 14 ? ['…' + words.slice(-14).join(' ')] : text ? [text] : [];
 }
 
-export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pending = [], jobs = [], onRemove, onRetry }) {
+export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onSave, pending = [], jobs = [], onRemove, onRetry }) {
   const [idx, setIdx] = useState(0);
   const [mode, setMode] = useState('video');
   const [images, setImages] = useState([]);
@@ -208,6 +208,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
   }
 
   function advance() {
+    if (stepJobs.length && onSave) onSave(stepJobs);
     setPhase('capture');
     setReviewJob(null);
     setStepJobs([]);
@@ -239,13 +240,19 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
   }
 
   const heard = [note, interim].filter(Boolean).join(' ');
+  const areaLabel = step.area === 'Equipment' ? 'kit' : step.area.toLowerCase();
+  const hasContent = images.length > 0 || !!heard.trim();
+  const readyParts = [
+    images.length ? `${images.length} picture${images.length === 1 ? '' : 's'}` : '',
+    heard.trim() ? 'your voice note' : '',
+  ].filter(Boolean);
   const captions = lastWords(heard);
   const badge =
     mode === 'video'
       ? recording
         ? `Recording 0:${String(seconds).padStart(2, '0')}`
         : images.length
-        ? `${images.length} shots saved`
+        ? `${images.length} picture${images.length === 1 ? '' : 's'} saved`
         : 'Ready'
       : mode === 'photo'
       ? `${images.length} photo${images.length === 1 ? '' : 's'}`
@@ -289,8 +296,8 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
           }}
           onMore={() => setPhase('capture')}
           onNext={advance}
-          nextLabel={isLast ? 'Looks right, finish' : `Looks right, next: ${steps[idx + 1].area.toLowerCase()}`}
-          busyLabel={isLast ? 'Finish, I’ll keep reading' : `Next: ${steps[idx + 1].area.toLowerCase()}, I’ll keep reading`}
+          nextLabel={isLast ? `Save ${areaLabel} and finish` : `Save ${areaLabel}, next: ${steps[idx + 1].area.toLowerCase()}`}
+          busyLabel={isLast ? 'Save and finish, I’ll keep reading' : `Save and move on, I’ll keep reading`}
         />
       )}
 
@@ -383,7 +390,9 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
         />
       ) : (
         <p className="sub" style={{ textAlign: 'center' }}>
-          {step.tip}
+          {hasContent
+            ? `Ready to upload: ${readyParts.join(' and ')}. Mix video, photos and voice, then tap Upload.`
+            : step.tip}
         </p>
       )}
 
@@ -403,7 +412,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
       </div>
 
       <button className="btn" onClick={check}>
-        Check my {step.area === 'Equipment' ? 'kit' : step.area.toLowerCase()}
+        {hasContent ? `Upload ${areaLabel}` : `Skip ${areaLabel}`}
       </button>
       </>
       )}

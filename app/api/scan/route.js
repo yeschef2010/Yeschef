@@ -1,5 +1,5 @@
 import { AREA_CATEGORIES } from '@/lib/helpers';
-import { getClient, MODEL, parseJson, replyText, imageBlock, noKeyResponse, failResponse } from '@/lib/ai';
+import { getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKeyResponse, failResponse } from '@/lib/ai';
 
 export const maxDuration = 60;
 
@@ -40,9 +40,20 @@ export async function POST(req) {
     const area = body.area || 'Auto';
     const note = (body.note || '').slice(0, 4000);
     const images = (body.images || []).slice(0, 10).map(imageBlock).filter(Boolean);
+    const docs = (body.docs || []).slice(0, 2).map(documentBlock).filter(Boolean);
     const isKit = area === 'Equipment';
+    const isReceipt = area === 'Receipt';
 
-    if (!note.trim() && images.length === 0) return Response.json({ items: [] });
+    if (!note.trim() && images.length === 0 && docs.length === 0) return Response.json({ items: [] });
+
+    const receiptHelp = isReceipt
+      ? `\n\nThis is a supermarket receipt or an online grocery order (Tesco, Sainsbury\u2019s, Asda, Aldi, Lidl, Morrisons, Waitrose, Ocado and so on), bought today.
+- Turn shortened receipt names into plain food names (e.g. "TSCO FF CHKN THGH 1KG" is "Chicken thighs", qty "1kg").
+- Use the quantity on the line (e.g. "2 x" means 2).
+- Put each item in the area it\u2019s normally kept: Fridge, Cupboards, Freezer or Spice rack (frozen food goes in Freezer).
+- Estimate "shelfDays" from today for fresh food as if just bought (e.g. fresh chicken 2\u20133, milk 7, bagged salad 4, carrots 14).
+- Skip anything that isn\u2019t food or drink (bags, cleaning, toiletries, nappies), and skip totals, savings, Clubcard or Nectar lines, and unavailable items.`
+      : '';
 
     const spiceHelp =
       area === 'Spice rack'
@@ -51,21 +62,24 @@ export async function POST(req) {
 
     const where = isKit
       ? 'The person is showing you their kitchen equipment.'
+      : isReceipt
+      ? 'The person is showing you a shopping receipt or order.'
       : area === 'Auto'
       ? 'The person is adding things they missed. Work out which area each item belongs in.'
       : `The person is showing you their ${area.toLowerCase()}. Put items in "${area}" unless they clearly belong elsewhere.`;
 
     const content = [
+      ...docs,
       ...images,
       {
         type: 'text',
-        text: `${where}${spiceHelp}\n\n${images.length ? `There are ${images.length} picture(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
+        text: `${where}${spiceHelp}${receiptHelp}\n\n${images.length || docs.length ? `There are ${images.length + docs.length} picture(s) or file(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
       },
     ];
 
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 2000,
+      max_tokens: 4000,
       system:
         'You are the stock-taking assistant inside Yes Chef!, a UK kitchen app for busy families. You turn quick videos, photos and spoken notes into a tidy stock list. Be accurate and never invent items you have no evidence for.',
       messages: [{ role: 'user', content }],

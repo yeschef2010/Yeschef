@@ -1,14 +1,14 @@
 'use client';
 import { useRef, useState } from 'react';
 import { FOOD_AREAS } from '@/lib/helpers';
-import { fileToSmallJpeg } from '@/lib/media';
+import { fileToSmallJpeg, receiptFiles } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
 import { Back, Camera, Chevron, Close, Keyboard, Mic } from './Icons';
 import ItemGroups from './ItemGroups';
 
 const SECTIONS = [...FOOD_AREAS, 'Equipment'];
 
-function AddMissed({ onAdd }) {
+function AddMissed({ onAdd, title }) {
   const [open, setOpen] = useState(null);
   const [text, setText] = useState('');
   const [interim, setInterim] = useState('');
@@ -62,7 +62,7 @@ function AddMissed({ onAdd }) {
 
   return (
     <div className="card tight" style={{ flexShrink: 0 }}>
-      <p style={{ fontSize: 15, fontWeight: 700 }}>Missed something? Add it</p>
+      <p style={{ fontSize: 15, fontWeight: 700 }}>{title || 'Missed something? Add it'}</p>
       <div className="grid3">
         <button className="mode-btn" aria-pressed={open === 'say'} onClick={() => toggle('say')}>
           <Mic />
@@ -143,7 +143,48 @@ function AddMissed({ onAdd }) {
   );
 }
 
-export default function Found({ title, subtitle, pending, jobs, onRemove, onAdd, onConfirm, confirmLabel, onBack, onRetry }) {
+function ReceiptCard({ onReceipt }) {
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function handle(files) {
+    if (!files || !files.length) return;
+    setBusy(true);
+    setMsg('');
+    const { images, docs, problems } = await receiptFiles(files);
+    if (images.length || docs.length) onReceipt(images, docs);
+    setMsg(problems.join(' '));
+    setBusy(false);
+  }
+
+  return (
+    <div className="card tight green" style={{ flexShrink: 0 }}>
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8FD39A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
+          <path d="M6 3 H18 V21 L15.5 19 L13 21 L10.5 19 L8 21 L6 19 Z" />
+          <path d="M9 8 H15 M9 12 H15 M9 16 H12" />
+        </svg>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <p style={{ fontSize: 16, fontWeight: 700 }}>Got a receipt? I'll read it</p>
+          <p className="sub" style={{ fontSize: 14 }}>Snap a paper receipt, or upload a screenshot or PDF of an online order.</p>
+        </div>
+      </div>
+      <div className="row">
+        <label className="btn sm" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {busy ? 'Reading…' : 'Photo of receipt'}
+          <input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(e) => { handle(e.target.files); e.target.value = ''; }} />
+        </label>
+        <label className="btn sm ghost" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          Upload a file
+          <input className="sr-only" type="file" accept="image/*,application/pdf,.pdf" multiple onChange={(e) => { handle(e.target.files); e.target.value = ''; }} />
+        </label>
+      </div>
+      {msg && <p className="error">{msg}</p>}
+    </div>
+  );
+}
+
+export default function Found({ title, subtitle, pending, jobs, onRemove, onAdd, onConfirm, confirmLabel, onBack, onRetry, onReceipt }) {
   const [openSecs, setOpenSecs] = useState({ Fridge: true });
   const loading = jobs.filter((j) => j.state === 'loading');
   const failed = jobs.filter((j) => j.state === 'error');
@@ -151,7 +192,7 @@ export default function Found({ title, subtitle, pending, jobs, onRemove, onAdd,
   const sections = SECTIONS.map((area) => {
     const items = pending.filter((p) => p.area === area);
     return { area, items, label: area === 'Equipment' ? 'Equipment' : area };
-  });
+  }).filter((sec) => !onReceipt || sec.items.length > 0);
 
   return (
     <div className="screen-fixed">
@@ -167,13 +208,14 @@ export default function Found({ title, subtitle, pending, jobs, onRemove, onAdd,
         </div>
       </div>
 
-      <AddMissed onAdd={onAdd} />
+      {onReceipt && <ReceiptCard onReceipt={onReceipt} />}
+      <AddMissed onAdd={onAdd} title={onReceipt ? 'Or tell me what you\u2019ve got' : undefined} />
 
       <div className="scroll">
         {loading.length > 0 && (
           <div className="card tight" style={{ flexDirection: 'row', alignItems: 'center' }}>
             <div className="spinner" />
-            <p className="sub">Reading {loading.map((j) => (j.area === 'Auto' ? 'what you added' : j.area.toLowerCase())).join(', ')}…</p>
+            <p className="sub">Reading {loading.map((j) => (j.area === 'Auto' ? 'what you added' : j.area === 'Receipt' ? 'your receipt' : j.area.toLowerCase())).join(', ')}…</p>
           </div>
         )}
         {failed.map((j) => (

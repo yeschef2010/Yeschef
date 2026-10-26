@@ -287,7 +287,7 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
 }
 
 /* ---------- Kitchen ---------- */
-export function Kitchen({ stock, onEdit, onAdd, onTour }) {
+export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
   const [open, setOpen] = useState({ Fridge: true });
   return (
     <div className="screen" style={{ paddingTop: 28 }}>
@@ -326,6 +326,11 @@ export function Kitchen({ stock, onEdit, onAdd, onTour }) {
                   <ItemGroups items={items} area={area} onTap={onEdit} showTags />
                 )}
                 {area === 'Spice rack' && <p className="sub" style={{ padding: '0 6px 4px' }}>Staples I assume you've always got: salt, pepper, cooking oil.</p>}
+                {onUpdateArea && (
+                  <button className="btn sm ghost" onClick={() => onUpdateArea(area)}>
+                    Update {area === 'Spice rack' ? 'spice rack' : area.toLowerCase()} with video, photos or voice
+                  </button>
+                )}
               </div>
             )}
           </div>
