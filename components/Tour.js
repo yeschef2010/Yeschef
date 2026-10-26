@@ -4,6 +4,7 @@ import { TOUR_STEPS } from '@/lib/helpers';
 import { PHOTO_SIDE, fileToSmallJpeg, framesFromVideoFile, grabFrame } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
 import { Back, Camera, Close, Mic, Video } from './Icons';
+import ItemGroups from './ItemGroups';
 
 const MAX_FRAMES = 10;
 
@@ -399,19 +400,7 @@ function Review({ area, job, items, onRemove, onRetry, onMore, onNext, nextLabel
             <p className="sub">Found so far:</p>
           )}
           {items.length > 0 && (
-            <div className="grid4">
-              {items.map((it) => (
-                <div className="tile removable" key={it.id}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <p className="name">{it.name}</p>
-                    <p className="qty">{it.qty || it.note || it.status || ''}</p>
-                  </div>
-                  <button className="x" onClick={() => onRemove(it.id)} aria-label={`Remove ${it.name}`}>
-                    <Close size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <ItemGroups items={items} area={area} onRemove={onRemove} />
           )}
         </div>
       </div>

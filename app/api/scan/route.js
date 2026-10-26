@@ -1,14 +1,20 @@
+import { AREA_CATEGORIES } from '@/lib/helpers';
 import { getClient, MODEL, parseJson, replyText, imageBlock, noKeyResponse, failResponse } from '@/lib/ai';
 
 export const maxDuration = 60;
 
 const FOOD_RULES = `Return JSON only, in this shape:
-{"items":[{"name":"Chorizo","qty":"Half a ring","area":"Fridge","shelfDays":5,"status":null}]}
+{"items":[{"name":"Chorizo","qty":"Half a ring","area":"Fridge","category":"Meat & fish","shelfDays":5,"status":null}]}
 
 Rules:
 - One entry per distinct food. Use short, everyday British names (coriander, not cilantro; courgette, not zucchini).
 - "qty" is a short, friendly amount: "2 tins", "Half a bag", "About 200g", "6".
 - "area" is one of: "Fridge", "Cupboards", "Spice rack", "Freezer".
+- "category" groups similar things together. Pick one from the list for that area:
+  Fridge: ${AREA_CATEGORIES.Fridge.join(', ')}
+  Cupboards: ${AREA_CATEGORIES.Cupboards.join(', ')}
+  Spice rack: ${AREA_CATEGORIES['Spice rack'].join(', ')}
+  Freezer: ${AREA_CATEGORIES.Freezer.join(', ')}
 - "shelfDays" is your best estimate of how many days from today it should be eaten by, for fresh or opened food. Use null for long-life things (tins, dried pasta, rice, spices, frozen food).
 - For spices and dried herbs use "status": "Got it", "Low" or "Out". Otherwise "status" is null, unless the person says something is running low ("Low") or finished ("Out").
 - What the person says is the best guide to amounts and condition. Use the pictures to spot things they didn't mention.
@@ -16,10 +22,11 @@ Rules:
 - If you can't see or hear anything useful, return {"items":[]}.`;
 
 const KIT_RULES = `Return JSON only, in this shape:
-{"items":[{"name":"Slow cooker","note":"About 6 litres"}]}
+{"items":[{"name":"Slow cooker","note":"About 6 litres","category":"Appliances"}]}
 
 Rules:
 - List cooking equipment and appliances: oven, hob, microwave, air fryer, slow cooker, pans, wok, baking trays, blender and so on.
+- "category" is one of: ${AREA_CATEGORIES.Equipment.join(', ')}.
 - "note" is a short useful detail (size, how many, or a quirk the person mentions, e.g. "Runs hot on the left").
 - If you can't see or hear anything useful, return {"items":[]}.`;
 

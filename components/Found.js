@@ -4,6 +4,7 @@ import { FOOD_AREAS } from '@/lib/helpers';
 import { fileToSmallJpeg } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
 import { Back, Camera, Chevron, Close, Keyboard, Mic } from './Icons';
+import ItemGroups from './ItemGroups';
 
 const SECTIONS = [...FOOD_AREAS, 'Equipment'];
 
@@ -207,20 +208,8 @@ export default function Found({ title, subtitle, pending, jobs, onRemove, onAdd,
                       Nothing here yet.
                     </p>
                   ) : (
-                    <div className="grid4">
-                      {s.items.map((it) => (
-                        <div className="tile removable" key={it.id}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <p className="name">{it.name}</p>
-                            <p className="qty">{it.qty || it.note || it.status || ''}</p>
-                          </div>
-                          <button className="x" onClick={() => onRemove(it.id)} aria-label={`Remove ${it.name}`}>
-                            <Close size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    <ItemGroups items={s.items} area={s.area} onRemove={onRemove} />
+                                    )}
                 </div>
               )}
             </div>

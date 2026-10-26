@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { FOOD_AREAS, MEALS, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
+import { AREA_CATEGORIES, FOOD_AREAS, MEALS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
+import ItemGroups from './ItemGroups';
 
 /* ---------- Welcome ---------- */
 export function Welcome({ onTour, onSkip }) {
@@ -207,13 +208,14 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
   const [qty, setQty] = useState(isKit ? item.note || '' : item.qty || '');
   const [area, setArea] = useState(item.area || 'Fridge');
   const [status, setStatus] = useState(item.status || '');
+  const [category, setCategory] = useState(() => categoryOf({ ...item, area: isKit ? 'Equipment' : item.area }));
   const [days, setDays] = useState(() => {
     const d = daysLeft(item);
     return d == null ? '' : String(Math.max(0, d));
   });
 
   function save() {
-    if (isKit) return onSave({ ...item, name: name.trim() || item.name, note: qty });
+    if (isKit) return onSave({ ...item, name: name.trim() || item.name, note: qty, category });
     const d = days === '' ? null : Math.max(0, parseInt(days, 10) || 0);
     onSave({
       ...item,
@@ -221,6 +223,7 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
       qty,
       area,
       status: status || null,
+      category: (AREA_CATEGORIES[area] || []).includes(category) ? category : null,
       shelfDays: d,
       addedAt: Date.now(),
     });
@@ -240,6 +243,12 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
         <input id="ed-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
         <label className="lbl" htmlFor="ed-qty">{isKit ? 'Note' : 'How much'}</label>
         <input id="ed-qty" className="input" value={qty} onChange={(e) => setQty(e.target.value)} />
+        <label className="lbl" htmlFor="ed-cat">Group</label>
+        <select id="ed-cat" className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+          {(AREA_CATEGORIES[isKit ? 'Equipment' : area] || []).map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
         {!isKit && (
           <>
             <div className="row">
@@ -308,20 +317,7 @@ export function Kitchen({ stock, onEdit, onAdd, onTour }) {
                 {items.length === 0 ? (
                   <p className="sub" style={{ padding: '6px 8px 8px' }}>Nothing logged here yet.</p>
                 ) : (
-                  <div className="grid4">
-                    {items.map((it) => {
-                      const tag = stockTag(it);
-                      return (
-                        <button className="tile" key={it.id} onClick={() => onEdit(it)}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span className="name">{it.name}</span>
-                            <span className="qty">{it.qty}</span>
-                          </div>
-                          <span className={`tag ${tag.cls}`}>{tag.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <ItemGroups items={items} area={area} onTap={onEdit} showTags />
                 )}
                 {area === 'Spice rack' && <p className="sub" style={{ padding: '0 6px 4px' }}>Staples I assume you've always got: salt, pepper, cooking oil.</p>}
               </div>
@@ -429,13 +425,8 @@ export function Kit({ kit, onBack, onEdit, onAdd, onFilm }) {
         <p className="sub">I only suggest recipes you can make with this. Tap one to change it.</p>
       </div>
       {kit.length > 0 ? (
-        <div className="grid4">
-          {kit.map((k) => (
-            <button className="tile plain" key={k.id} onClick={() => onEdit(k)} style={{ minHeight: 72 }}>
-              <span className="name">{k.name}</span>
-              <span className="qty">{k.note}</span>
-            </button>
-          ))}
+        <div className="plain-bg">
+          <ItemGroups items={kit.map((k) => ({ ...k, area: 'Equipment' }))} area="Equipment" onTap={onEdit} />
         </div>
       ) : (
         <p className="sub">No kit logged yet.</p>

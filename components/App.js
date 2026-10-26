@@ -33,6 +33,7 @@ function normaliseFood(it, fallbackArea) {
     area,
     shelfDays: typeof it.shelfDays === 'number' ? it.shelfDays : null,
     status,
+    category: typeof it.category === 'string' ? it.category : null,
     addedAt: Date.now(),
   };
 }
@@ -121,7 +122,7 @@ export default function App() {
           });
         const mapped =
           kind === 'kit'
-            ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', kind: 'kit', job: id }))
+            ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', category: it.category || null, kind: 'kit', job: id }))
             : items.map((it) => ({ ...normaliseFood(it, area), kind: 'food', job: id }));
         if (mapped.length === 0 && typedFallback) {
           mapped.push({ ...normaliseFood({ name: typedFallback }, 'Cupboards'), kind: 'food', job: id });
@@ -170,7 +171,7 @@ export default function App() {
     setKit((k) => {
       const next = [...k];
       kitItems.forEach((f) => {
-        const item = { id: f.id, name: f.name, note: f.note };
+        const item = { id: f.id, name: f.name, note: f.note, category: f.category || null };
         const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase());
         if (i >= 0) next[i] = { ...next[i], note: item.note || next[i].note };
         else next.push(item);
