@@ -98,15 +98,42 @@ export default function App() {
   const submitScan = useCallback((area, images, note, typedFallback) => {
     const id = newId();
     setJobs((j) => [...j, { id, area, state: 'loading', images, note, typedFallback }]);
-    postJson('/api/scan', { area, images, note })
-      .then((data) => {
-        const items = (data.items || []).filter((it) => it && it.name);
+
+    // Send photos a few at a time so each request stays small and the labels stay sharp.
+    const batches = [];
+    for (let i = 0; i < images.length; i += 3) batches.push(images.slice(i, i + 3));
+    if (batches.length === 0) batches.push([]);
+
+    Promise.allSettled(batches.map((imgs) => postJson('/api/scan', { area, images: imgs, note })))
+      .then((results) => {
+        const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+        if (ok.length === 0) throw results[0].reason || new Error(FRIENDLY_FAIL);
+        const kind = ok[0].kind;
+        const seen = new Set();
+        const items = ok
+          .flatMap((d) => d.items || [])
+          .filter((it) => it && it.name)
+          .filter((it) => {
+            const k = `${String(it.name).toLowerCase().trim()}|${it.area || ''}`;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
         const mapped =
-          data.kind === 'kit'
+          kind === 'kit'
             ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', kind: 'kit' }))
             : items.map((it) => ({ ...normaliseFood(it, area), kind: 'food' }));
         if (mapped.length === 0 && typedFallback) {
           mapped.push({ ...normaliseFood({ name: typedFallback }, 'Cupboards'), kind: 'food' });
+        }
+        if (mapped.length === 0) {
+          const where = area === 'Auto' ? 'those' : `your ${area.toLowerCase()}`;
+          const hint =
+            area === 'Spice rack'
+              ? 'Try photos closer up, a few jars at a time, with the labels facing the camera.'
+              : 'Try again closer up, in good light, or say what\u2019s there as you go.';
+          setJobs((j) => j.map((x) => (x.id === id ? { ...x, state: 'error', message: `I couldn\u2019t spot anything in ${where}. ${hint}` } : x)));
+          return;
         }
         setPending((p) => [...p, ...mapped]);
         setJobs((j) => j.filter((x) => x.id !== id));

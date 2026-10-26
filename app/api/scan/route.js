@@ -36,6 +36,11 @@ export async function POST(req) {
 
     if (!note.trim() && images.length === 0) return Response.json({ items: [] });
 
+    const spiceHelp =
+      area === 'Spice rack'
+        ? '\n\nThese are spice jars and packets. Read every label you can, including brand labels (e.g. Schwartz, supermarket own-brand). List each spice or dried herb separately. If a jar is clearly nearly empty, mark it "Low". Skip a jar only if you genuinely can\u2019t read it.'
+        : '';
+
     const where = isKit
       ? 'The person is showing you their kitchen equipment.'
       : area === 'Auto'
@@ -46,7 +51,7 @@ export async function POST(req) {
       ...images,
       {
         type: 'text',
-        text: `${where}\n\n${images.length ? `There are ${images.length} picture(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
+        text: `${where}${spiceHelp}\n\n${images.length ? `There are ${images.length} picture(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
       },
     ];
 

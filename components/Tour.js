@@ -124,7 +124,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
       const list = await Promise.all(Array.from(files).slice(0, MAX_FRAMES).map(fileToSmallJpeg));
       setImages((prev) => [...prev, ...list].slice(0, MAX_FRAMES));
     } catch (e) {
-      setCamError('I couldn’t read one of those photos.');
+      setCamError('I couldn’t open one of those photos. If you’re on a Mac, try a JPG or PNG, or use your phone.');
     }
     setBusy(false);
   }
@@ -170,6 +170,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
 
   function pickMode(m) {
     stopRecording();
+    setCamError('');
     setMode(m);
   }
 
@@ -222,7 +223,8 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
             </label>
           </div>
         )}
-        {mode === 'photo' && images.length === 0 && <p className="placeholder">{step.scene}</p>}
+        {mode === 'photo' && images.length === 0 && !camError && <p className="placeholder">{step.scene}</p>}
+        {mode === 'photo' && camError && <p className="placeholder sub" style={{ fontSize: 16 }}>{camError}</p>}
         {mode === 'voice' && <p className="placeholder">Just talk, no camera needed</p>}
 
         <div className="badge-rec">
