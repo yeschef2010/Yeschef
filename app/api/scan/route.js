@@ -17,7 +17,7 @@ Rules:
   File each item by WHAT IT IS, not where you happened to see it. The app remembers it was in the fridge.
   Fresh herbs (basil, coriander, parsley, herb pots) always go in "Fresh herbs".
   All drinks go in "Drinks": soft drinks, juice, squash, water, tea, coffee, mixers, beer, cider, wine and spirits. Milk stays in "Fridge".
-  Their "category" is one of: "Soft drinks" (fizzy drinks, juice, squash, water, tea, coffee, anything alcohol-free), "Mixers" (tonic, soda water, ginger ale, ginger beer, bitter lemon), "Beer & cider", "Wine" (including port and sherry), "Spirits" (gin, vodka, whisky, rum, liqueurs, Aperol, Baileys).
+  Their "category" is one of: "Soft drinks" (fizzy drinks, juice, tea, coffee, anything alcohol-free), "Mixers" (tonic, soda water, ginger ale, ginger beer, bitter lemon), "Cordials" (squash and cordials, e.g. Robinsons, Ribena, elderflower), "Waters" (still and sparkling water, flavoured water), "Beer & cider", "Wine" (including port and sherry), "Spirits" (gin, vodka, whisky, rum, liqueurs, Aperol, Baileys).
   For wine, also give "style": "Red", "White", "Rosé" or "Sparkling" (prosecco, champagne, cava).
   Household products are not food but are tracked too: cleaning products, cloths, bin bags and foil go in "Cleaning"; laundry detergent, fabric conditioner and stain removers go in "Washing machine"; dishwasher tablets, rinse aid and salt go in "Dishwasher".
   Fruit used for drinks, like lemons and limes, stays in "Fridge".
