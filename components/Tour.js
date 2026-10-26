@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { TOUR_STEPS } from '@/lib/helpers';
-import { fileToSmallJpeg, framesFromVideoFile, grabFrame } from '@/lib/media';
+import { PHOTO_SIDE, fileToSmallJpeg, framesFromVideoFile, grabFrame } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
 import { Back, Camera, Mic, Video } from './Icons';
 
@@ -36,10 +36,21 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
   const step = steps[idx];
   const isLast = idx === steps.length - 1;
   const canSpeak = speechSupported();
+  const needsCam = mode === 'video' || mode === 'photo';
+  const [flash, setFlash] = useState(false);
+
+  function snap() {
+    if (imagesRef.current.length >= MAX_FRAMES) return;
+    const f = grabFrame(videoRef.current, PHOTO_SIDE);
+    if (!f) return;
+    setImages((prev) => [...prev, f].slice(0, MAX_FRAMES));
+    setFlash(true);
+    setTimeout(() => setFlash(false), 150);
+  }
 
   // Live camera for video mode.
   useEffect(() => {
-    if (mode !== 'video') return undefined;
+    if (!needsCam) return undefined;
     let cancelled = false;
     setCamError('');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -47,7 +58,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
       return undefined;
     }
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false })
+      .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } }, audio: false })
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -67,7 +78,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
       streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, idx]);
+  }, [needsCam]);
 
   useEffect(() => () => stopEverything(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -213,7 +224,8 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
       )}
 
       <div className="camera">
-        {mode === 'video' && !camError && <video ref={videoRef} playsInline muted autoPlay />}
+        {needsCam && !camError && <video ref={videoRef} playsInline muted autoPlay />}
+        {flash && <div style={{ position: 'absolute', inset: 0, background: '#fff', opacity: 0.6 }} />}
         {mode === 'video' && camError && (
           <div className="placeholder" style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
             <p className="sub">{camError}</p>
@@ -223,7 +235,6 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
             </label>
           </div>
         )}
-        {mode === 'photo' && images.length === 0 && !camError && <p className="placeholder">{step.scene}</p>}
         {mode === 'photo' && camError && <p className="placeholder sub" style={{ fontSize: 16 }}>{camError}</p>}
         {mode === 'voice' && <p className="placeholder">Just talk, no camera needed</p>}
 
@@ -256,10 +267,20 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
             </button>
           )}
           {mode === 'photo' && (
-            <label className="btn" style={{ alignSelf: 'center', borderRadius: 30, display: 'flex', alignItems: 'center' }}>
-              {busy ? 'Reading…' : images.length ? 'Add more photos' : 'Take or choose photos'}
-              <input className="sr-only" type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
-            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12 }}>
+              <label className="btn sm ghost" style={{ display: 'flex', alignItems: 'center', justifySelf: 'start', background: 'rgba(20,27,23,0.75)', borderRadius: 22 }}>
+                {busy ? 'Reading…' : 'Upload'}
+                <input className="sr-only" type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
+              </label>
+              {!camError && (
+                <button
+                  onClick={snap}
+                  aria-label="Take photo"
+                  style={{ width: 72, height: 72, borderRadius: 36, border: '5px solid #fff', background: '#E8833A', padding: 0, flexShrink: 0 }}
+                />
+              )}
+              <span />
+            </div>
           )}
           {mode === 'voice' && canSpeak && (
             <button
