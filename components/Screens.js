@@ -9,7 +9,7 @@ export function Welcome({ onTour, onSkip }) {
   return (
     <div className="screen" style={{ justifyContent: 'space-between', paddingTop: 56 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-        <Logo width={220} />
+        <Logo width={190} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <h1 className="h1">
             Hi Chef<span className="dot">!</span>
@@ -114,14 +114,14 @@ export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mod
                 <h3 className="h3" style={{ fontSize: 24 }}>
                   {idea.title}
                 </h3>
-                {idea.tag && <p className="sub" style={{ color: '#C9D2CC' }}>{idea.tag}</p>}
-                {idea.why && <p style={{ fontSize: 15, lineHeight: 1.45, color: '#C9D2CC' }}>{idea.why}</p>}
+                {idea.tag && <p className="sub">{idea.tag}</p>}
+                {idea.why && <p style={{ fontSize: 15, lineHeight: 1.45, color: 'var(--text-2)' }}>{idea.why}</p>}
                 {idea.missing && idea.missing.length > 0 && (
-                  <div className="row" style={{ alignItems: 'flex-start', background: '#141B17', borderRadius: 12, padding: 12 }}>
+                  <div className="row" style={{ alignItems: 'flex-start', background: 'var(--honey)', borderRadius: 12, padding: 12 }}>
                     <Bag />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                      <p style={{ fontSize: 14, lineHeight: 1.45, color: '#C9D2CC' }}>
-                        <strong style={{ color: '#fff' }}>Grab: {listJoin(idea.missing.map((m) => m.toLowerCase()))}.</strong>
+                      <p style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--text-2)' }}>
+                        <strong style={{ color: 'var(--forest)' }}>Grab: {listJoin(idea.missing.map((m) => m.toLowerCase()))}.</strong>
                       </p>
                       <button className="btn sm ghost" style={{ height: 36, alignSelf: 'flex-start' }} onClick={() => onAddToList(idea.missing)}>
                         Add to shopping list
@@ -161,7 +161,7 @@ export function Recipe({ idea, onBack, onCooked, onAddToList }) {
       {idea.tip && (
         <div className="card orange tight">
           <p style={{ fontSize: 15, lineHeight: 1.45 }}>
-            <strong style={{ color: '#F3A86E' }}>Heads up:</strong> {idea.tip}
+            <strong>Heads up:</strong> {idea.tip}
           </p>
         </div>
       )}
@@ -173,7 +173,7 @@ export function Recipe({ idea, onBack, onCooked, onAddToList }) {
           <div className="list-row" key={i}>
             <p style={{ fontSize: 16 }}>
               {ing.name}
-              {ing.amount ? <span style={{ color: '#AEB8B1' }}> · {ing.amount}</span> : null}
+              {ing.amount ? <span style={{ color: 'var(--muted)' }}> · {ing.amount}</span> : null}
             </p>
             <span className={`pill tag ${ing.inStock ? 'fine' : 'urgent'}`} style={{ alignSelf: 'center' }}>
               {ing.inStock ? 'In stock' : 'Grab one'}
@@ -328,7 +328,7 @@ export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
                 {area === 'Spice rack' && <p className="sub" style={{ padding: '0 6px 4px' }}>Staples I assume you've always got: salt, pepper, cooking oil.</p>}
                 {onUpdateArea && (
                   <button className="btn sm ghost" onClick={() => onUpdateArea(area)}>
-                    Update {area === 'Spice rack' ? 'spice rack' : area.toLowerCase()} with video, photos or voice
+                    Update {area === 'Spice rack' ? 'spice rack' : area.toLowerCase()}
                   </button>
                 )}
               </div>
@@ -602,9 +602,6 @@ export function About({ onBack }) {
       <button className="icon-btn" onClick={onBack} aria-label="Back"><Back /></button>
       <h2 className="h2" style={{ fontSize: 32 }}>About</h2>
       <Logo width={200} />
-      <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1 }}>
-        yes chef<span className="dot">!</span>
-      </p>
       <p className="lead">You're the chef. We do the prep: what's in, what needs using up, and what to buy, so less goes in the bin and more stays in your pocket.</p>
       <p className="small">Test version 0.1</p>
     </div>

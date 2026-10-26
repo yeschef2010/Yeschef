@@ -160,7 +160,7 @@ function ReceiptCard({ onReceipt }) {
   return (
     <div className="card tight green" style={{ flexShrink: 0 }}>
       <div className="row" style={{ alignItems: 'flex-start' }}>
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8FD39A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2E6B1F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
           <path d="M6 3 H18 V21 L15.5 19 L13 21 L10.5 19 L8 21 L6 19 Z" />
           <path d="M9 8 H15 M9 12 H15 M9 16 H12" />
         </svg>

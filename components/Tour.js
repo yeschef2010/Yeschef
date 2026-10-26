@@ -332,7 +332,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
         )}
 
         {paused && (
-          <div className="caption" style={{ position: 'absolute', top: 54, left: 14, right: 14, background: '#4A3414', color: '#F5B85A' }}>
+          <div className="caption" style={{ position: 'absolute', top: 54, left: 14, right: 14, background: 'var(--honey)', color: 'var(--forest)' }}>
             Paused when your screen turned off. I’ve kept what you said. Tap below to carry on.
           </div>
         )}
@@ -346,14 +346,14 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
             <button
               className="btn"
               onClick={recording ? stopRecording : startRecording}
-              style={{ alignSelf: 'center', borderRadius: 30, minWidth: 160, background: recording ? '#fff' : undefined }}
+              style={{ alignSelf: 'center', borderRadius: 30, minWidth: 160, background: recording ? '#F8F5EC' : undefined, color: recording ? '#153D2C' : undefined }}
             >
               {recording ? 'Stop' : images.length ? 'Record more' : 'Start recording'}
             </button>
           )}
           {mode === 'photo' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12 }}>
-              <label className="btn sm ghost" style={{ display: 'flex', alignItems: 'center', justifySelf: 'start', background: 'rgba(20,27,23,0.75)', borderRadius: 22 }}>
+              <label className="btn sm ghost" style={{ display: 'flex', alignItems: 'center', justifySelf: 'start', background: 'rgba(248,245,236,0.9)', borderRadius: 22 }}>
                 {busy ? 'Reading…' : 'Upload'}
                 <input className="sr-only" type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
               </label>
@@ -361,7 +361,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
                 <button
                   onClick={snap}
                   aria-label="Take photo"
-                  style={{ width: 72, height: 72, borderRadius: 36, border: '5px solid #fff', background: '#E8833A', padding: 0, flexShrink: 0 }}
+                  style={{ width: 72, height: 72, borderRadius: 36, border: '5px solid #F8F5EC', background: '#EB4933', padding: 0, flexShrink: 0 }}
                 />
               )}
               <span />
@@ -371,7 +371,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
             <button
               className="btn"
               onClick={recording ? stopRecording : () => { setPaused(false); setRecording(true); startListening(); }}
-              style={{ alignSelf: 'center', borderRadius: 30, minWidth: 160, background: recording ? '#fff' : undefined }}
+              style={{ alignSelf: 'center', borderRadius: 30, minWidth: 160, background: recording ? '#F8F5EC' : undefined, color: recording ? '#153D2C' : undefined }}
             >
               {recording ? 'Stop' : heard ? 'Talk some more' : 'Start talking'}
             </button>

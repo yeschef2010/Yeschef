@@ -5,8 +5,8 @@ export default function manifest() {
     description: "Your kitchen assistant. You're the chef, we do the prep.",
     start_url: '/',
     display: 'standalone',
-    background_color: '#141B17',
-    theme_color: '#141B17',
+    background_color: '#F8F5EC',
+    theme_color: '#F8F5EC',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
