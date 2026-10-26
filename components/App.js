@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
-import { FOOD_AREAS, MEALS, TOUR_STEPS, dateLine, daysLeft, mealForHour, todayKey } from '@/lib/helpers';
+import { FOOD_AREAS, MEALS, TOUR_STEPS, dateLine, daysLeft, mealForHour, migrateArea, stepForArea, todayKey } from '@/lib/helpers';
 import Tour from './Tour';
 import Found from './Found';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
@@ -60,6 +60,15 @@ export default function App() {
     profile,
     setProfile,
   });
+
+  // Move herbs and drinks logged before they had their own areas.
+  useEffect(() => {
+    if (!mounted) return;
+    setStock((s) => {
+      const next = s.map(migrateArea);
+      return next.some((x, i) => x !== s[i]) ? next : s;
+    });
+  }, [mounted, setStock]);
 
   // Opened from an invite link: ?join=CODE
   useEffect(() => {
@@ -392,7 +401,7 @@ export default function App() {
             setScreen('review');
           }}
           onTour={() => startTour()}
-          onUpdateArea={(area) => startTour(TOUR_STEPS.filter((t) => t.area === area))}
+          onUpdateArea={(area) => startTour([stepForArea(area)])}
         />
       )}
 
@@ -404,7 +413,7 @@ export default function App() {
           onBack={go('home')}
           onEdit={(k) => setEditing({ item: k, isKit: true })}
           onAdd={(name) => setKit((k) => [...k, { id: newId(), name, note: '' }])}
-          onFilm={() => startTour([TOUR_STEPS[4]])}
+          onFilm={() => startTour([stepForArea('Equipment')])}
         />
       )}
 

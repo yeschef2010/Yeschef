@@ -240,7 +240,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
   }
 
   const heard = [note, interim].filter(Boolean).join(' ');
-  const areaLabel = step.area === 'Equipment' ? 'kit' : step.area.toLowerCase();
+  const areaLabel = (step.label || step.area).toLowerCase();
   const hasContent = images.length > 0 || !!heard.trim();
   const readyParts = [
     images.length ? `${images.length} picture${images.length === 1 ? '' : 's'}` : '',
@@ -267,7 +267,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
           <Back />
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <p style={{ fontSize: 16, fontWeight: 700 }}>{step.area}</p>
+          <p style={{ fontSize: 16, fontWeight: 700 }}>{step.label || step.area}</p>
           <p className="small">
             Kitchen tour{steps.length > 1 ? ` · step ${idx + 1} of ${steps.length}` : ''}
           </p>
@@ -296,7 +296,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
           }}
           onMore={() => setPhase('capture')}
           onNext={advance}
-          nextLabel={isLast ? `Save ${areaLabel} and finish` : `Save ${areaLabel}, next: ${steps[idx + 1].area.toLowerCase()}`}
+          nextLabel={isLast ? `Save ${areaLabel} and finish` : `Save ${areaLabel}, next: ${(steps[idx + 1].label || steps[idx + 1].area).toLowerCase()}`}
           busyLabel={isLast ? 'Save and finish, I’ll keep reading' : `Save and move on, I’ll keep reading`}
         />
       )}
@@ -448,7 +448,12 @@ function Review({ area, job, items, onRemove, onRetry, onMore, onNext, nextLabel
             <p className="sub">Found so far:</p>
           )}
           {items.length > 0 && (
-            <ItemGroups items={items} area={area} onRemove={onRemove} />
+            [...new Set(items.map((it) => it.area))].map((a) => (
+              <div key={a} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {new Set(items.map((it) => it.area)).size > 1 && <p className="area-label">{a === 'Equipment' ? 'Kit' : a}</p>}
+                <ItemGroups items={items.filter((it) => it.area === a)} area={a} onRemove={onRemove} />
+              </div>
+            ))
           )}
         </div>
       </div>

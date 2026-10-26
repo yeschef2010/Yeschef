@@ -289,6 +289,9 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
 /* ---------- Kitchen ---------- */
 export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
   const [open, setOpen] = useState({ Fridge: true });
+  const [openCats, setOpenCats] = useState({});
+  const toggleCat = (area) => (cat) => setOpenCats((o) => ({ ...o, [`${area}|${cat}`]: !o[`${area}|${cat}`] }));
+  const catsFor = (area) => Object.fromEntries(Object.entries(openCats).filter(([k]) => k.startsWith(area + '|')).map(([k, v]) => [k.split('|')[1], v]));
   return (
     <div className="screen" style={{ paddingTop: 28 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
@@ -323,7 +326,7 @@ export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
                 {items.length === 0 ? (
                   <p className="sub" style={{ padding: '6px 8px 8px' }}>Nothing logged here yet.</p>
                 ) : (
-                  <ItemGroups items={items} area={area} onTap={onEdit} showTags />
+                  <ItemGroups items={items} area={area} onTap={onEdit} showTags collapsible openCats={catsFor(area)} onToggleCat={toggleCat(area)} />
                 )}
                 {area === 'Spice rack' && <p className="sub" style={{ padding: '0 6px 4px' }}>Staples I assume you've always got: salt, pepper, cooking oil.</p>}
                 {onUpdateArea && (

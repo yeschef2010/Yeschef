@@ -9,13 +9,20 @@ const FOOD_RULES = `Return JSON only, in this shape:
 Rules:
 - One entry per distinct food. Use short, everyday British names of three words or fewer (coriander, not cilantro; "Greek yoghurt", not "Greek style natural yoghurt 500g"). Leave out brands and pack sizes.
 - "qty" is a short, friendly amount: "2 tins", "Half a bag", "About 200g", "6".
-- "area" is one of: "Fridge", "Cupboards", "Spice rack", "Freezer".
+- "area" is one of: "Fridge", "Cupboards", "Fresh herbs", "Spice rack", "Freezer", "Drinks", "Wine".
+  Fresh herbs (basil, coriander, parsley, herb pots) always go in "Fresh herbs", wherever they're kept.
+  Non-alcoholic drinks (juice, squash, fizzy drinks, water, tea, coffee, alcohol-free beer or wine) go in "Drinks". Milk stays in "Fridge".
+  Wine, beer, cider and spirits go in "Wine".
 - "category" groups similar things together. Pick one from the list for that area:
   Fridge: ${AREA_CATEGORIES.Fridge.join(', ')}
   Cupboards: ${AREA_CATEGORIES.Cupboards.join(', ')}
+  Fresh herbs: ${AREA_CATEGORIES['Fresh herbs'].join(', ')}
   Spice rack: ${AREA_CATEGORIES['Spice rack'].join(', ')}
   Freezer: ${AREA_CATEGORIES.Freezer.join(', ')}
-- "shelfDays" is your best estimate of how many days from today it should be eaten by, for fresh or opened food. Use null for long-life things (tins, dried pasta, rice, spices, frozen food).
+  Drinks: ${AREA_CATEGORIES.Drinks.join(', ')}
+  Wine: ${AREA_CATEGORIES.Wine.join(', ')}
+- "shelfDays" is your best estimate of how many days from today it should be eaten by, for fresh or opened food. Use null for long-life things (tins, dried pasta, rice, spices, frozen food, unopened drinks and wine). An opened bottle of wine is about 3 days; opened juice about 5.
+- For wine, put the grape or style in the name when you can see it (e.g. "Rioja", "Sauvignon blanc", "Prosecco"), and "qty" like "1 bottle" or "Half a bottle (open)".
 - For spices and dried herbs use "status": "Got it", "Low" or "Out". Otherwise "status" is null, unless the person says something is running low ("Low") or finished ("Out").
 - What the person says is the best guide to amounts and condition. Use the pictures to spot things they didn't mention.
 - Ignore things that aren't food or drink (people, pets, packaging with nothing in it).
@@ -50,7 +57,7 @@ export async function POST(req) {
       ? `\n\nThis is a supermarket receipt or an online grocery order (Tesco, Sainsbury\u2019s, Asda, Aldi, Lidl, Morrisons, Waitrose, Ocado and so on), bought today.
 - Turn shortened receipt names into plain food names (e.g. "TSCO FF CHKN THGH 1KG" is "Chicken thighs", qty "1kg").
 - Use the quantity on the line (e.g. "2 x" means 2).
-- Put each item in the area it\u2019s normally kept: Fridge, Cupboards, Freezer or Spice rack (frozen food goes in Freezer).
+- Put each item in the area it\u2019s normally kept (frozen food goes in Freezer, fresh herbs in Fresh herbs, soft drinks in Drinks, alcohol in Wine).
 - Estimate "shelfDays" from today for fresh food as if just bought (e.g. fresh chicken 2\u20133, milk 7, bagged salad 4, carrots 14).
 - Skip anything that isn\u2019t food or drink (bags, cleaning, toiletries, nappies), and skip totals, savings, Clubcard or Nectar lines, and unavailable items.`
       : '';
@@ -58,6 +65,13 @@ export async function POST(req) {
     const spiceHelp =
       area === 'Spice rack'
         ? '\n\nThese are spice jars and packets. Read every label you can, including brand labels (e.g. Schwartz, supermarket own-brand). List each spice or dried herb separately. If a jar is clearly nearly empty, mark it "Low". Skip a jar only if you genuinely can\u2019t read it.'
+        : '';
+
+    const drinksHelp =
+      area === 'Drinks' || area === 'Wine'
+        ? '\n\nThis is their drinks: soft drinks, juice and squash go in "Drinks"; wine, beer, cider and spirits go in "Wine". Read bottle labels where you can.'
+        : area === 'Fresh herbs'
+        ? '\n\nThese are fresh herbs, cut or growing in pots. Put them all in "Fresh herbs".'
         : '';
 
     const where = isKit
@@ -73,7 +87,7 @@ export async function POST(req) {
       ...images,
       {
         type: 'text',
-        text: `${where}${spiceHelp}${receiptHelp}\n\n${images.length || docs.length ? `There are ${images.length + docs.length} picture(s) or file(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
+        text: `${where}${spiceHelp}${drinksHelp}${receiptHelp}\n\n${images.length || docs.length ? `There are ${images.length + docs.length} picture(s) or file(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
       },
     ];
 
