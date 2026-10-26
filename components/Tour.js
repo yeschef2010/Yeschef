@@ -86,6 +86,38 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
 
   useEffect(() => () => stopEverything(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep the screen on during the tour, so it doesn't lock mid-sentence.
+  const [paused, setPaused] = useState(false);
+  const recordingRef = useRef(false);
+  recordingRef.current = recording;
+  useEffect(() => {
+    let lock = null;
+    const grab = async () => {
+      try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+          lock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {
+        // Not supported or not allowed; the phone may still dim.
+      }
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') grab();
+      else if (recordingRef.current) {
+        // The phone locked or the app was switched away: stop cleanly and keep what was said.
+        stopRecording();
+        setPaused(true);
+      }
+    };
+    grab();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      if (lock) lock.release().catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function startListening() {
     if (!canSpeak) return;
     const l = createListener(({ finalText, interim: i }) => {
@@ -106,6 +138,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
   }
 
   function startRecording() {
+    setPaused(false);
     setRecording(true);
     setSeconds(0);
     const take = () => {
@@ -158,6 +191,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
 
   // Send this area off to be read, then show what was found before moving on.
   function check() {
+    setPaused(false);
     const finalNote = listenerRef.current ? listenerRef.current.stop() || note : note;
     stopRecording();
     const hasSomething = imagesRef.current.length || (finalNote || '').trim();
@@ -290,6 +324,11 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
           </div>
         )}
 
+        {paused && (
+          <div className="caption" style={{ position: 'absolute', top: 54, left: 14, right: 14, background: '#4A3414', color: '#F5B85A' }}>
+            Paused when your screen turned off. I’ve kept what you said. Tap below to carry on.
+          </div>
+        )}
         <div className="captions">
           {captions.map((c, i) => (
             <p key={i} className="caption">
@@ -324,7 +363,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pen
           {mode === 'voice' && canSpeak && (
             <button
               className="btn"
-              onClick={recording ? stopRecording : () => { setRecording(true); startListening(); }}
+              onClick={recording ? stopRecording : () => { setPaused(false); setRecording(true); startListening(); }}
               style={{ alignSelf: 'center', borderRadius: 30, minWidth: 160, background: recording ? '#fff' : undefined }}
             >
               {recording ? 'Stop' : heard ? 'Talk some more' : 'Start talking'}
