@@ -171,9 +171,13 @@ export default function App() {
   }, []);
 
   const current = screen || (onboarded ? 'home' : 'welcome');
-  const mealKey = mealForHour(now.getHours());
+  const mealKey = mealForHour(now.getHours(), now.getMinutes());
   const ideaKey = `${todayKey(now)}-${mealKey}-${mode}`;
-  const idea = ideas[ideaKey] || null;
+  // Three ideas per meal. Older saved ideas were a single one, so wrap those.
+  const ideaSet = ((v) => (!v ? null : Array.isArray(v.ideas) ? v : v.title ? { ideas: [v], avoid: v.avoid || [] } : null))(ideas[ideaKey]);
+  const ideaList = ideaSet ? ideaSet.ideas : [];
+  const [ideaIdx, setIdeaIdx] = useState(0);
+  const idea = ideaList[ideaIdx] || ideaList[0] || null;
 
   /* ----- Saving found items into the kitchen ----- */
   const commitItems = useCallback((list) => {
@@ -306,8 +310,7 @@ export default function App() {
     const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
     const weekend = now.getDay() === 0 || now.getDay() === 6;
     try {
-      const prev = ideas[ideaKey];
-      const avoid = avoidCurrent && prev ? [...(prev.avoid || []), prev.title] : [];
+      const avoid = avoidCurrent && ideaSet ? [...(ideaSet.avoid || []), ...ideaSet.ideas.map((i) => i.title)].slice(-12) : [];
       const data = await postJson('/api/ideas', {
         meal: mealKey,
         mode,
@@ -318,13 +321,14 @@ export default function App() {
         context: `It's ${day}${weekend ? ' (weekend)' : ''}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.`,
         avoid,
       });
-      setIdeas((all) => ({ ...all, [ideaKey]: { ...data, avoid } }));
+      setIdeas((all) => ({ ...all, [ideaKey]: { ideas: data.ideas || [], avoid } }));
+      setIdeaIdx(0);
       setIdeaState('idle');
     } catch (e) {
       setIdeaError(e.message || FRIENDLY_FAIL);
       setIdeaState('error');
     }
-  }, [stock, kit, profile, mealKey, mode, ideaKey, ideas, now]);
+  }, [stock, kit, profile, mealKey, mode, ideaKey, ideaSet, now]);
 
   useEffect(() => {
     if (!mounted || current !== 'home' || !settings.autoIdea) return;
@@ -448,7 +452,7 @@ export default function App() {
           mealKey={mealKey}
           dateText={dateLine(now)}
           stock={stock}
-          idea={idea}
+          ideas={ideaList}
           ideaState={ideaState}
           ideaError={ideaError}
           mode={mode}
@@ -458,7 +462,11 @@ export default function App() {
           }}
           onGetIdea={() => getIdea(false)}
           onAnother={() => getIdea(true)}
-          onCook={go('recipe')}
+          onCook={(i) => {
+            setIdeaIdx(i);
+            setBanner('');
+            setScreen('recipe');
+          }}
           onAddToList={(names) => addToList(names)}
           onTour={() => startAdd('kitchen')}
           banner={banner}

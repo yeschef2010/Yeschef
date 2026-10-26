@@ -56,7 +56,7 @@ export function DrinksCard({ stock, title = 'Ready to pour' }) {
 }
 
 /* ---------- Main meal screen ---------- */
-export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, showUseUp }) {
+export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, showUseUp }) {
   const meal = MEALS[mealKey];
   const urgent = stock.filter((s) => s.area !== 'Spice rack' && !s.status && stockTag(s).cls === 'red');
   const empty = stock.length === 0;
@@ -93,7 +93,7 @@ export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mod
             <div className="card orange tight">
               <p className="eyebrow orange">Use it up</p>
               <p style={{ fontSize: 16, lineHeight: 1.45 }}>
-                Your {listJoin(urgent.slice(0, 3).map((u) => u.name))} {urgent.length === 1 ? 'needs' : 'need'} using soon. I'll plan around {urgent.length === 1 ? 'it' : 'them'}.
+                Your {listJoin(urgent.slice(0, 3).map((u) => u.name.toLowerCase()))} {urgent.length === 1 && !/s$/i.test(urgent[0].name) ? 'needs' : 'need'} using soon. I'll plan around {urgent.length === 1 && !/s$/i.test(urgent[0].name) ? 'it' : 'them'}.
               </p>
             </div>
           )}
@@ -107,66 +107,84 @@ export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mod
             </button>
           </div>
 
-          <div className="card" style={{ borderRadius: 20, padding: 18, gap: 12 }}>
-            {ideaState === 'loading' && (
+          {mealKey === 'tomorrow' && (
+            <p className="sub" style={{ marginBottom: -4 }}>Dinner’s done for today. Here’s what you could have tomorrow, and anything to do tonight.</p>
+          )}
+
+          {ideaState === 'loading' && (
+            <div className="card" style={{ borderRadius: 20, padding: 18 }}>
               <div className="row" style={{ minHeight: 120, justifyContent: 'center' }}>
                 <div className="spinner" />
-                <p className="sub">Thinking up {meal.tab.toLowerCase()}…</p>
+                <p className="sub">Thinking up {meal.thinking}…</p>
               </div>
-            )}
-            {ideaState === 'error' && (
-              <>
-                <p className="error">{ideaError}</p>
-                <button className="btn sm" onClick={onGetIdea}>
-                  Try again
-                </button>
-              </>
-            )}
-            {ideaState === 'idle' && !idea && (
-              <>
-                <p className="h3">Ready when you are</p>
-                <button className="btn" onClick={onGetIdea}>
-                  Get a {meal.tab.toLowerCase()} idea
-                </button>
-              </>
-            )}
-            {ideaState === 'idle' && idea && (
-              <>
-                <p className="eyebrow">
-                  {meal.tab}
-                  {idea.time ? ` · ${idea.time}` : ''}
-                </p>
-                <h3 className="h3" style={{ fontSize: 24 }}>
-                  {idea.title}
-                </h3>
-                {idea.tag && <p className="sub">{idea.tag}</p>}
-                {idea.why && <p style={{ fontSize: 15, lineHeight: 1.45, color: 'var(--text-2)' }}>{idea.why}</p>}
-                {idea.missing && idea.missing.length > 0 && (
-                  <div className="row" style={{ alignItems: 'flex-start', background: 'var(--honey)', borderRadius: 12, padding: 12 }}>
-                    <Bag />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                      <p style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--text-2)' }}>
-                        <strong style={{ color: 'var(--forest)' }}>Grab: {listJoin(idea.missing.map((m) => m.toLowerCase()))}.</strong>
-                      </p>
-                      <button className="btn sm ghost" style={{ height: 36, alignSelf: 'flex-start' }} onClick={() => onAddToList(idea.missing)}>
-                        Add to shopping list
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <button className="btn" onClick={onCook}>
-                  Let's cook
-                </button>
-                <button className="btn quiet sm" onClick={onAnother}>
-                  Another idea
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
+          {ideaState === 'error' && (
+            <div className="card" style={{ borderRadius: 20, padding: 18, gap: 12 }}>
+              <p className="error">{ideaError}</p>
+              <button className="btn sm" onClick={onGetIdea}>
+                Try again
+              </button>
+            </div>
+          )}
+          {ideaState === 'idle' && ideas.length === 0 && (
+            <div className="card" style={{ borderRadius: 20, padding: 18, gap: 12 }}>
+              <p className="h3">Ready when you are</p>
+              <button className="btn" onClick={onGetIdea}>
+                {meal.get}
+              </button>
+            </div>
+          )}
+          {ideaState === 'idle' && ideas.length > 0 && (
+            <>
+              <div className="ideas">
+                {ideas.map((idea, i) => (
+                  <button key={i} className="idea-card" onClick={() => onCook(i)}>
+                    <span className="eyebrow">
+                      {IDEA_TYPES[idea.type] ? (idea.type === 'quick' && mode === 'fun' ? 'Easiest' : IDEA_TYPES[idea.type]) : 'Idea'}
+                      {idea.time ? ` · ${idea.time}` : ''}
+                    </span>
+                    <span className="idea-title">{idea.title}</span>
+                    {idea.why && <span className="idea-why">{idea.why}</span>}
+                    {idea.prep && (
+                      <span className="idea-prep">
+                        <strong>Tonight:</strong> {idea.prep}
+                      </span>
+                    )}
+                    <span className="idea-foot">
+                      <Lights lights={idea.lights} small />
+                      {idea.missing && idea.missing.length > 0 && <span className="idea-grab">Grab: {listJoin(idea.missing.map((m) => m.toLowerCase()))}</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button className="btn quiet sm" onClick={onAnother}>
+                Three more ideas
+              </button>
+            </>
+          )}
           {mealKey === 'dinner' && <DrinksCard stock={stock} title="And to drink, you’ve got everything for" />}
         </>
       )}
     </div>
+  );
+}
+
+const IDEA_TYPES = { useup: 'Use it up', quick: 'Quickest', different: 'Something different' };
+
+// UK front-of-pack style traffic lights, per portion.
+const LIGHT_NAMES = [['fat', 'Fat'], ['saturates', 'Sat fat'], ['sugar', 'Sugar'], ['salt', 'Salt']];
+export function Lights({ lights, small = false }) {
+  if (!lights || !LIGHT_NAMES.some(([k]) => lights[k])) return null;
+  return (
+    <span className={`lights${small ? ' small' : ''}`} aria-label={`Per portion: ${LIGHT_NAMES.filter(([k]) => lights[k]).map(([k, n]) => `${n} ${lights[k]}`).join(', ')}`}>
+      {LIGHT_NAMES.filter(([k]) => lights[k]).map(([k, n]) => (
+        <span key={k} className={`light ${lights[k]}`}>
+          {n}
+          {!small && <em>{lights[k] === 'medium' ? 'Med' : lights[k] === 'low' ? 'Low' : 'High'}</em>}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -264,6 +282,19 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList }) {
         </h2>
         <p className="sub">{[idea.time, idea.tag].filter(Boolean).join(' · ')}</p>
       </div>
+      {idea.prep && (
+        <div className="card honey tight">
+          <p style={{ fontSize: 15, lineHeight: 1.45 }}>
+            <strong>Tonight:</strong> {idea.prep}
+          </p>
+        </div>
+      )}
+      {idea.lights && LIGHT_NAMES.some(([k]) => idea.lights[k]) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <p className="eyebrow">Per portion</p>
+          <Lights lights={idea.lights} />
+        </div>
+      )}
       {idea.tip && (
         <div className="card orange tight">
           <p style={{ fontSize: 15, lineHeight: 1.45 }}>
