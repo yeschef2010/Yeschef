@@ -1,12 +1,12 @@
 'use client';
 import { useRef, useState } from 'react';
-import { FOOD_AREAS } from '@/lib/helpers';
+import { FOOD_AREAS, PRODUCT_AREAS } from '@/lib/helpers';
 import { fileToSmallJpeg, receiptFiles } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
 import { Back, Camera, Chevron, Close, Keyboard, Mic } from './Icons';
 import ItemGroups from './ItemGroups';
 
-const SECTIONS = [...FOOD_AREAS, 'Equipment'];
+const SECTIONS = [...FOOD_AREAS, ...PRODUCT_AREAS, 'Equipment'];
 
 function AddMissed({ onAdd, title }) {
   const [open, setOpen] = useState(null);

@@ -9,7 +9,7 @@ export default function ItemGroups({ items, area, onTap, onRemove, showTags = fa
   return (
     <div className="groups">
       {groups.map((g) => {
-        const open = !collapsible || !!openCats[g.category];
+        const open = !collapsible || !showCategories || !!openCats[g.category];
         const reds = showTags ? g.items.filter((it) => stockTag(it).cls === 'red').length : 0;
         const ambers = showTags ? g.items.filter((it) => stockTag(it).cls === 'amber').length : 0;
         return (

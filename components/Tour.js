@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { TOUR_STEPS } from '@/lib/helpers';
+import { TOUR_STEPS, kindOfArea } from '@/lib/helpers';
 import { PHOTO_SIDE, fileToSmallJpeg, framesFromVideoFile, grabFrame } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
 import { Back, Camera, Close, Mic, Video } from './Icons';
@@ -269,7 +269,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
           <p style={{ fontSize: 16, fontWeight: 700 }}>{step.label || step.area}</p>
           <p className="small">
-            Kitchen tour{steps.length > 1 ? ` · step ${idx + 1} of ${steps.length}` : ''}
+            {kindOfArea(steps[0].area) === 'product' ? 'Products tour' : 'Kitchen tour'}{steps.length > 1 ? ` · step ${idx + 1} of ${steps.length}` : ''}
           </p>
         </div>
         <div style={{ width: 44 }} />
@@ -296,7 +296,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, onS
           }}
           onMore={() => setPhase('capture')}
           onNext={advance}
-          nextLabel={isLast ? `Save ${areaLabel} and finish` : `Save ${areaLabel}, next: ${(steps[idx + 1].label || steps[idx + 1].area).toLowerCase()}`}
+          nextLabel={isLast ? 'Save and finish' : `Save, next: ${(steps[idx + 1].label || steps[idx + 1].area).toLowerCase()}`}
           busyLabel={isLast ? 'Save and finish, I’ll keep reading' : `Save and move on, I’ll keep reading`}
         />
       )}

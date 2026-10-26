@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { AREA_CATEGORIES, FOOD_AREAS, MEALS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
+import { AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
@@ -228,7 +228,7 @@ export function Recipe({ idea, onBack, onCooked, onAddToList }) {
 }
 
 /* ---------- Edit sheet ---------- */
-export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
+export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, onClose }) {
   const [name, setName] = useState(item.name);
   const [qty, setQty] = useState(isKit ? item.note || '' : item.qty || '');
   const [area, setArea] = useState(item.area || 'Fridge');
@@ -281,15 +281,17 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label className="lbl" htmlFor="ed-area">Where</label>
                 <select id="ed-area" className="input" value={area} onChange={(e) => setArea(e.target.value)}>
-                  {FOOD_AREAS.map((a) => (
+                  {(isProduct ? PRODUCT_AREAS : FOOD_AREAS).map((a) => (
                     <option key={a}>{a}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label className="lbl" htmlFor="ed-days">Use within (days)</label>
-                <input id="ed-days" className="input" inputMode="numeric" placeholder="Keeps" value={days} onChange={(e) => setDays(e.target.value.replace(/[^0-9]/g, ''))} />
-              </div>
+              {!isProduct && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label className="lbl" htmlFor="ed-days">Use within (days)</label>
+                  <input id="ed-days" className="input" inputMode="numeric" placeholder="Keeps" value={days} onChange={(e) => setDays(e.target.value.replace(/[^0-9]/g, ''))} />
+                </div>
+              )}
             </div>
             <label className="lbl" htmlFor="ed-status">Stock level</label>
             <select id="ed-status" className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -301,7 +303,7 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
         )}
         <div className="row">
           <button className="btn ghost" style={{ flex: 1 }} onClick={() => onRemove(item.id)}>
-            {isKit ? 'Remove' : 'Used it up'}
+            {isKit ? 'Remove' : isProduct ? 'Remove' : 'Used it up'}
           </button>
           <button className="btn" style={{ flex: 1 }} onClick={save}>
             Save
@@ -313,29 +315,38 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
 }
 
 /* ---------- Kitchen ---------- */
-export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
-  const [open, setOpen] = useState({ Fridge: true });
+export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea, products = false }) {
+  const areas = products ? PRODUCT_AREAS : FOOD_AREAS;
+  const [open, setOpen] = useState({ [areas[0]]: true });
   const [openCats, setOpenCats] = useState({});
   const toggleCat = (area) => (cat) => setOpenCats((o) => ({ ...o, [`${area}|${cat}`]: !o[`${area}|${cat}`] }));
   const catsFor = (area) => Object.fromEntries(Object.entries(openCats).filter(([k]) => k.startsWith(area + '|')).map(([k, v]) => [k.split('|')[1], v]));
   return (
     <div className="screen" style={{ paddingTop: 28 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
-        <h2 className="h2" style={{ fontSize: 32 }}>Your kitchen</h2>
+        <h2 className="h2" style={{ fontSize: 32 }}>{products ? 'Household products' : 'Your kitchen'}</h2>
         <p className="sub">{stock.length} things logged. Tap one to change it.</p>
       </div>
-      <div className="legend" aria-label="Colour key">
-        <span><i className="green" />Good</span>
-        <span><i className="amber" />Use soon</span>
-        <span><i className="red" />Check before use</span>
-        <span><i className="grey" />Keeps</span>
-      </div>
+      {products ? (
+        <div className="legend" aria-label="Colour key">
+          <span><i className="amber" />Running low</span>
+          <span><i className="red" />Run out</span>
+          <span><i className="grey" />Plenty</span>
+        </div>
+      ) : (
+        <div className="legend" aria-label="Colour key">
+          <span><i className="green" />Good</span>
+          <span><i className="amber" />Use soon</span>
+          <span><i className="red" />Check before use</span>
+          <span><i className="grey" />Keeps</span>
+        </div>
+      )}
       <div className="grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <button className="btn sm" onClick={onAdd}>Add food</button>
-        <button className="btn sm ghost" onClick={onTour}>Kitchen tour</button>
+        <button className="btn sm" onClick={onAdd}>{products ? 'Add products' : 'Add food'}</button>
+        <button className="btn sm ghost" onClick={onTour}>{products ? 'Products tour' : 'Kitchen tour'}</button>
       </div>
-      <DrinksCard stock={stock} />
-      {FOOD_AREAS.map((area) => {
+      {!products && <DrinksCard stock={stock} />}
+      {areas.map((area) => {
         const items = stock.filter((s) => s.area === area);
         const flagged = items.filter(needsAttention).length;
         const isOpen = !!open[area];
@@ -353,7 +364,16 @@ export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
                 {items.length === 0 ? (
                   <p className="sub" style={{ padding: '6px 8px 8px' }}>Nothing logged here yet.</p>
                 ) : (
-                  <ItemGroups items={items} area={area} onTap={onEdit} showTags collapsible openCats={catsFor(area)} onToggleCat={toggleCat(area)} />
+                  <ItemGroups
+                    items={items}
+                    area={area}
+                    onTap={onEdit}
+                    showTags
+                    showCategories={!FLAT_AREAS.includes(area)}
+                    collapsible
+                    openCats={catsFor(area)}
+                    onToggleCat={toggleCat(area)}
+                  />
                 )}
                 {area === 'Spice rack' && <p className="sub" style={{ padding: '0 6px 4px' }}>Staples I assume you've always got: salt, pepper, cooking oil.</p>}
                 {onUpdateArea && (

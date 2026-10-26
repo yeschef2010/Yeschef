@@ -2,11 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
-import { FOOD_AREAS, MEALS, TOUR_STEPS, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, stepForArea, todayKey } from '@/lib/helpers';
+import { FOOD_AREAS, MEALS, PRODUCT_AREAS, PRODUCT_STEPS, TOUR_STEPS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, stepForArea, todayKey } from '@/lib/helpers';
 import Tour from './Tour';
 import Found from './Found';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
-import { Basket, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
+import { Basket, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
 
 const FRIENDLY_FAIL = 'Sorry Chef, I couldn’t reach the kitchen brain. Check your signal and try again.';
 
@@ -23,7 +23,8 @@ async function postJson(url, body) {
 }
 
 function normaliseFood(it, fallbackArea) {
-  const area = FOOD_AREAS.includes(it.area) ? it.area : FOOD_AREAS.includes(fallbackArea) ? fallbackArea : 'Cupboards';
+  const ALL = [...FOOD_AREAS, ...PRODUCT_AREAS];
+  const area = ALL.includes(it.area) ? it.area : ALL.includes(fallbackArea) ? fallbackArea : 'Cupboards';
   let status = it.status || null;
   if (status && !['Low', 'Out'].includes(status)) status = null;
   return {
@@ -42,6 +43,7 @@ function normaliseFood(it, fallbackArea) {
 export default function App() {
   const [stock, setStock] = usePersistentState('yc.stock', []);
   const [kit, setKit] = usePersistentState('yc.kit', []);
+  const [products, setProducts] = usePersistentState('yc.products', []);
   const [pending, setPending] = usePersistentState('yc.pending', []);
   const [onboarded, setOnboarded] = usePersistentState('yc.onboarded', false);
   const [profile, setProfile] = usePersistentState('yc.profile', { name: '', household: '', dietary: '' });
@@ -57,7 +59,7 @@ export default function App() {
     code: household,
     setCode: setHousehold,
     mounted,
-    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList] },
+    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList], products: [products, setProducts] },
     profile,
     setProfile,
   });
@@ -118,8 +120,21 @@ export default function App() {
 
   /* ----- Saving found items into the kitchen ----- */
   const commitItems = useCallback((list) => {
-    const food = list.filter((p) => p.kind !== 'kit');
+    const food = list.filter((p) => p.kind !== 'kit' && p.kind !== 'product');
     const kitItems = list.filter((p) => p.kind === 'kit');
+    const productItems = list.filter((p) => p.kind === 'product');
+    if (productItems.length) {
+      setProducts((ps) => {
+        const next = [...ps];
+        productItems.forEach((f) => {
+          const { kind, job, seenIn, locations, ...item } = f;
+          const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase() && x.area === item.area);
+          if (i >= 0) next[i] = { ...next[i], ...item, id: next[i].id };
+          else next.push(item);
+        });
+        return next;
+      });
+    }
     if (food.length) {
       setStock((s) => {
         const next = [...s];
@@ -154,7 +169,7 @@ export default function App() {
       });
     }
     if (food.length || kitItems.length) setIdeas({});
-  }, [setStock, setKit, setIdeas]);
+  }, [setStock, setKit, setProducts, setIdeas]);
 
   // Jobs whose results should go straight into the kitchen when they arrive.
   const autoSave = useRef(new Set());
@@ -188,7 +203,10 @@ export default function App() {
         const mapped =
           kind === 'kit'
             ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', category: it.category || null, kind: 'kit', job: id }))
-            : items.map((it) => ({ ...normaliseFood(it, area), kind: 'food', job: id }));
+            : items.map((it) => {
+                const f = normaliseFood(it, area);
+                return { ...f, kind: kindOfArea(f.area), job: id };
+              });
         if (mapped.length === 0 && typedFallback) {
           mapped.push({ ...normaliseFood({ name: typedFallback }, 'Cupboards'), kind: 'food', job: id });
         }
@@ -200,7 +218,7 @@ export default function App() {
               : area === 'Receipt'
               ? 'Try a flat, well-lit photo with the whole receipt in shot, or a long receipt in two halves.'
               : 'Try again closer up, in good light, or say what\u2019s there as you go.';
-          setJobs((j) => j.map((x) => (x.id === id ? { ...x, state: 'error', message: `I couldn\u2019t spot any food in ${where}. ${hint}` } : x)));
+          setJobs((j) => j.map((x) => (x.id === id ? { ...x, state: 'error', message: `I couldn\u2019t spot anything in ${where}. ${hint}` } : x)));
           return;
         }
         if (autoSave.current.has(id)) {
@@ -241,7 +259,7 @@ export default function App() {
     setPending([]);
     setJobs([]);
     setOnboarded(true);
-    setScreen(reviewMode === 'add' ? 'kitchen' : 'home');
+    setScreen(reviewMode === 'addProducts' ? 'products' : reviewMode === 'add' ? 'kitchen' : 'home');
   }
 
   /* ----- Meal ideas ----- */
@@ -316,6 +334,7 @@ export default function App() {
     clearAllSaved();
     setStock([]);
     setKit([]);
+    setProducts([]);
     setPending([]);
     setShopList([]);
     setIdeas({});
@@ -328,9 +347,9 @@ export default function App() {
 
   if (!mounted) return <div className="app" />;
 
-  const tabs = ['home', 'kitchen', 'shop', 'kit', 'account', 'settings', 'about'];
+  const tabs = ['home', 'kitchen', 'products', 'shop', 'kit', 'account', 'settings', 'about'];
   const showTabs = tabs.includes(current);
-  const showMenu = ['home', 'kitchen', 'shop'].includes(current);
+  const showMenu = ['home', 'kitchen', 'products', 'shop'].includes(current);
   const go = (s) => () => {
     setBanner('');
     setScreen(s);
@@ -362,17 +381,19 @@ export default function App() {
           onDone={() => {
             setOnboarded(true);
             setBanner('Your kitchen\u2019s saved. Tap Kitchen any time to update an area.');
-            setScreen(tourSteps.length === 1 ? (tourSteps[0].area === 'Equipment' ? 'kit' : 'kitchen') : 'home');
+            setScreen(kindOfArea(tourSteps[0].area) === 'product' ? 'products' : tourSteps.length === 1 ? (tourSteps[0].area === 'Equipment' ? 'kit' : 'kitchen') : 'home');
           }}
-          onExit={() => setScreen(onboarded ? 'kitchen' : 'welcome')}
+          onExit={() => setScreen(kindOfArea(tourSteps[0].area) === 'product' ? 'products' : onboarded ? 'kitchen' : 'welcome')}
         />
       )}
 
       {current === 'review' && (
         <Found
-          title={reviewMode === 'add' ? 'Add to your kitchen' : "Here's what I found"}
+          title={reviewMode === 'addProducts' ? 'Add household products' : reviewMode === 'add' ? 'Add to your kitchen' : "Here's what I found"}
           subtitle={
-            reviewMode === 'add'
+            reviewMode === 'addProducts'
+              ? 'Scan a receipt, or say, snap or type what you\u2019ve got.'
+              : reviewMode === 'add'
               ? 'Scan a receipt, or say, snap or type what you\u2019ve got.'
               : `${pending.length} things from your tour. Open each section to check it.`
           }
@@ -380,11 +401,11 @@ export default function App() {
           jobs={jobs}
           onRemove={(id) => setPending((p) => p.filter((x) => x.id !== id))}
           onAdd={(images, note, typed) => submitScan('Auto', images, note, typed)}
-          onReceipt={reviewMode === 'add' ? (images, docs) => submitScan('Receipt', images, '', null, docs) : undefined}
+          onReceipt={reviewMode !== 'tour' ? (images, docs) => submitScan('Receipt', images, '', null, docs) : undefined}
           onConfirm={confirmPending}
           onRetry={retryJob}
-          onBack={reviewMode === 'add' ? () => setScreen('kitchen') : null}
-          confirmLabel={reviewMode === 'add' ? 'Save to my kitchen' : 'Looks right, Chef'}
+          onBack={reviewMode !== 'tour' ? () => setScreen(reviewMode === 'addProducts' ? 'products' : 'kitchen') : null}
+          confirmLabel={reviewMode === 'addProducts' ? 'Save products' : reviewMode === 'add' ? 'Save to my kitchen' : 'Looks right, Chef'}
         />
       )}
 
@@ -426,7 +447,21 @@ export default function App() {
         />
       )}
 
-      {current === 'shop' && <Shop list={shopList} setList={setShopList} stock={stock} />}
+      {current === 'products' && (
+        <Kitchen
+          products
+          stock={products}
+          onEdit={(it) => setEditing({ item: it, isKit: false, isProduct: true })}
+          onAdd={() => {
+            setReviewMode('addProducts');
+            setScreen('review');
+          }}
+          onTour={() => startTour(PRODUCT_STEPS)}
+          onUpdateArea={(area) => startTour(PRODUCT_STEPS.filter((p) => p.area === area))}
+        />
+      )}
+
+      {current === 'shop' && <Shop list={shopList} setList={setShopList} stock={[...stock, ...products]} />}
 
       {current === 'kit' && (
         <Kit
@@ -491,14 +526,17 @@ export default function App() {
         <EditSheet
           item={editing.item}
           isKit={editing.isKit}
+          isProduct={!!editing.isProduct}
           onClose={() => setEditing(null)}
           onRemove={(id) => {
             if (editing.isKit) setKit((k) => k.filter((x) => x.id !== id));
+            else if (editing.isProduct) setProducts((p) => p.filter((x) => x.id !== id));
             else setStock((s) => s.filter((x) => x.id !== id));
             setEditing(null);
           }}
           onSave={(item) => {
             if (editing.isKit) setKit((k) => k.map((x) => (x.id === item.id ? item : x)));
+            else if (editing.isProduct) setProducts((p) => p.map((x) => (x.id === item.id ? item : x)));
             else setStock((s) => s.map((x) => (x.id === item.id ? item : x)));
             setEditing(null);
           }}
@@ -514,6 +552,10 @@ export default function App() {
           <button aria-current={current === 'kitchen' ? 'page' : undefined} onClick={go('kitchen')}>
             <Fridge />
             Kitchen
+          </button>
+          <button aria-current={current === 'products' ? 'page' : undefined} onClick={go('products')}>
+            <Spray />
+            Products
           </button>
           <button aria-current={current === 'shop' ? 'page' : undefined} onClick={go('shop')}>
             <Basket />
