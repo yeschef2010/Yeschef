@@ -268,9 +268,10 @@ function CookedSheet({ idea, stock, onConfirm, onClose }) {
   );
 }
 
-export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList }) {
+export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetry }) {
   const [cooking, setCooking] = useState(false);
   if (!idea) return null;
+  const waiting = idea.detail === 'loading' || idea.detail === 'error' || !Array.isArray(idea.steps) || !idea.steps.length;
   return (
     <div className="screen">
       <button className="icon-btn" onClick={onBack} aria-label="Back">
@@ -302,6 +303,26 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList }) {
           </p>
         </div>
       )}
+      {waiting ? (
+        <div className="card" style={{ borderRadius: 20, padding: 18, gap: 12 }}>
+          {idea.detail === 'error' ? (
+            <>
+              <p className="error">Sorry Chef, I couldn’t write that recipe out. Try again in a moment.</p>
+              {onRetry && (
+                <button className="btn sm" onClick={onRetry}>
+                  Try again
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="row" style={{ minHeight: 80, justifyContent: 'center' }}>
+              <div className="spinner" />
+              <p className="sub">Writing the recipe out…</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       <div>
         <p className="eyebrow" style={{ marginBottom: 4 }}>
           Ingredients
@@ -335,6 +356,8 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList }) {
       <button className="btn" onClick={() => setCooking(true)}>
         Cooked it, update my kitchen
       </button>
+        </>
+      )}
       {cooking && <CookedSheet idea={idea} stock={stock} onClose={() => setCooking(false)} onConfirm={(changes) => { setCooking(false); onCooked(changes); }} />}
     </div>
   );

@@ -303,32 +303,55 @@ export default function App() {
 
 
   /* ----- Meal ideas ----- */
-  const getIdea = useCallback(async (avoidCurrent) => {
-    setIdeaState('loading');
-    setIdeaError('');
+  // What the AI needs to know for any idea or recipe right now.
+  const ideaBase = useCallback(() => {
     const stockForAi = stock.map((s) => ({ name: s.name, qty: ((t) => (t ? `${s.qty}; ${t.n} ${t.unit === 'each' ? t.word || 'each' : t.unit} in total` : s.qty))(totalOf(s)), area: s.area, daysLeft: daysLeft(s), status: s.status }));
     const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
     const weekend = now.getDay() === 0 || now.getDay() === 6;
+    return {
+      meal: mealKey,
+      mode,
+      stock: stockForAi,
+      kit: kit.map((k) => ({ name: k.name, note: k.note })),
+      household: profile.household,
+      dietary: profile.dietary,
+      context: `It's ${day}${weekend ? ' (weekend)' : ''}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.`,
+    };
+  }, [stock, kit, profile, mealKey, mode, now]);
+
+  // Fill in one idea's full recipe (ingredients, steps) in the background.
+  const loadRecipe = useCallback((key, i, card, base) => {
+    const patch = (p) =>
+      setIdeas((all) => {
+        const set = all[key];
+        if (!set || !Array.isArray(set.ideas) || !set.ideas[i] || set.ideas[i].title !== card.title) return all;
+        const list = set.ideas.map((x, j) => (j === i ? { ...x, ...p } : x));
+        return { ...all, [key]: { ...set, ideas: list } };
+      });
+    patch({ detail: 'loading' });
+    postJson('/api/ideas', { ...base, step: 'recipe', idea: { title: card.title, why: card.why, time: card.time } })
+      .then((r) => patch({ ...r, missing: r.missing && r.missing.length ? r.missing : card.missing, detail: 'ready' }))
+      .catch(() => patch({ detail: 'error' }));
+  }, [setIdeas]);
+
+  const getIdea = useCallback(async (avoidCurrent) => {
+    setIdeaState('loading');
+    setIdeaError('');
+    const base = ideaBase();
+    const key = ideaKey;
     try {
       const avoid = avoidCurrent && ideaSet ? [...(ideaSet.avoid || []), ...ideaSet.ideas.map((i) => i.title)].slice(-12) : [];
-      const data = await postJson('/api/ideas', {
-        meal: mealKey,
-        mode,
-        stock: stockForAi,
-        kit: kit.map((k) => ({ name: k.name, note: k.note })),
-        household: profile.household,
-        dietary: profile.dietary,
-        context: `It's ${day}${weekend ? ' (weekend)' : ''}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.`,
-        avoid,
-      });
-      setIdeas((all) => ({ ...all, [ideaKey]: { ideas: data.ideas || [], avoid } }));
+      const data = await postJson('/api/ideas', { ...base, step: 'cards', avoid });
+      const cards = (data.ideas || []).map((c) => ({ ...c, detail: 'loading' }));
+      setIdeas((all) => ({ ...all, [key]: { ideas: cards, avoid } }));
       setIdeaIdx(0);
       setIdeaState('idle');
+      cards.forEach((c, i) => loadRecipe(key, i, c, base));
     } catch (e) {
       setIdeaError(e.message || FRIENDLY_FAIL);
       setIdeaState('error');
     }
-  }, [stock, kit, profile, mealKey, mode, ideaKey, ideaSet, now]);
+  }, [ideaBase, ideaKey, ideaSet, loadRecipe]);
 
   useEffect(() => {
     if (!mounted || current !== 'home' || !settings.autoIdea) return;
@@ -474,7 +497,7 @@ export default function App() {
         />
       )}
 
-      {current === 'recipe' && <Recipe idea={idea} stock={stock} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n)} />}
+      {current === 'recipe' && <Recipe idea={idea} stock={stock} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, ideaBase())} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n)} />}
 
       {current === 'kitchen' && (
         <Kitchen
