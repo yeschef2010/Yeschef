@@ -2,9 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
-import { FOOD_AREAS, MEALS, PRODUCT_AREAS, PRODUCT_STEPS, TOUR_STEPS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, stepForArea, todayKey } from '@/lib/helpers';
-import Tour from './Tour';
-import Found from './Found';
+import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
+import AddItems from './Tour';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
 import { Basket, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
 
@@ -22,7 +21,18 @@ async function postJson(url, body) {
   return data;
 }
 
-function normaliseFood(it, fallbackArea) {
+const PHYSICAL = { Fridge: 'Fridge', Freezer: 'Freezer', Cupboard: 'Cupboards', Cupboards: 'Cupboards' };
+
+function cleanCheck(c, areas) {
+  if (!c || typeof c !== 'object' || !c.question || !Array.isArray(c.options)) return null;
+  const options = c.options
+    .filter((o) => o && o.label)
+    .map((o) => ({ label: String(o.label), area: areas.includes(o.area) ? o.area : undefined, shelfDays: typeof o.shelfDays === 'number' ? o.shelfDays : o.shelfDays === null ? null : undefined }))
+    .slice(0, 3);
+  return options.length >= 2 ? { question: String(c.question), options } : null;
+}
+
+function normaliseFood(it, fallbackArea, where) {
   const ALL = [...FOOD_AREAS, ...PRODUCT_AREAS];
   const area = ALL.includes(it.area) ? it.area : ALL.includes(fallbackArea) ? fallbackArea : 'Cupboards';
   let status = it.status || null;
@@ -35,7 +45,9 @@ function normaliseFood(it, fallbackArea) {
     shelfDays: typeof it.shelfDays === 'number' ? it.shelfDays : null,
     status,
     category: typeof it.category === 'string' ? it.category : null,
-    seenIn: fallbackArea || null,
+    // Where it physically is: what the person told us, what the AI saw, or the area being scanned.
+    seenIn: PHYSICAL[where] || PHYSICAL[it.seenIn] || fallbackArea || null,
+    check: cleanCheck(it.check, ALL),
     addedAt: Date.now(),
   };
 }
@@ -96,8 +108,7 @@ export default function App() {
   }, [mounted]);
 
   const [screen, setScreen] = useState(null);
-  const [tourSteps, setTourSteps] = useState(TOUR_STEPS);
-  const [reviewMode, setReviewMode] = useState('tour'); // 'tour' | 'add'
+  const [addMode, setAddMode] = useState('kitchen'); // 'kitchen' | 'products' | 'kit'
   const [jobs, setJobs] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -127,7 +138,7 @@ export default function App() {
       setProducts((ps) => {
         const next = [...ps];
         productItems.forEach((f) => {
-          const { kind, job, seenIn, locations, ...item } = f;
+          const { kind, job, seenIn, locations, check, ...item } = f;
           const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase() && x.area === item.area);
           if (i >= 0) next[i] = { ...next[i], ...item, id: next[i].id };
           else next.push(item);
@@ -139,7 +150,7 @@ export default function App() {
       setStock((s) => {
         const next = [...s];
         food.forEach((f) => {
-          const { kind, job, seenIn, ...item } = f;
+          const { kind, job, seenIn, check, ...item } = f;
           // File by what it is, but remember where it was seen: a bottle in the fridge
           // adds "1 chilled" rather than replacing the six in the cupboard.
           const key = locationKey(seenIn, item.area);
@@ -175,9 +186,9 @@ export default function App() {
   const autoSave = useRef(new Set());
 
   /* ----- Reading photos, video frames, notes, receipts and files ----- */
-  const submitScan = useCallback((area, images, note, typedFallback, docs = []) => {
+  const submitScan = useCallback((area, images, note, typedFallback, docs = [], opts = {}) => {
     const id = newId();
-    setJobs((j) => [...j, { id, area, state: 'loading', images, note, typedFallback, docs }]);
+    setJobs((j) => [...j, { id, area, state: 'loading', images, note, typedFallback, docs, opts }]);
 
     // Send photos a few at a time so each request stays small and the labels stay sharp. Each file goes on its own.
     const batches = [];
@@ -185,7 +196,7 @@ export default function App() {
     docs.forEach((d) => batches.push({ images: [], docs: [d] }));
     if (batches.length === 0) batches.push({ images: [], docs: [] });
 
-    Promise.allSettled(batches.map((b) => postJson('/api/scan', { area, images: b.images, docs: b.docs, note })))
+    Promise.allSettled(batches.map((b) => postJson('/api/scan', { area, images: b.images, docs: b.docs, note, where: opts.where || null })))
       .then((results) => {
         const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
         if (ok.length === 0) throw results[0].reason || new Error(FRIENDLY_FAIL);
@@ -204,7 +215,7 @@ export default function App() {
           kind === 'kit'
             ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', category: it.category || null, kind: 'kit', job: id }))
             : items.map((it) => {
-                const f = normaliseFood(it, area);
+                const f = normaliseFood(it, area, opts.where);
                 return { ...f, kind: kindOfArea(f.area), job: id };
               });
         if (mapped.length === 0 && typedFallback) {
@@ -240,7 +251,7 @@ export default function App() {
 
   function retryJob(job) {
     setJobs((j) => j.filter((x) => x.id !== job.id));
-    return submitScan(job.area, job.images, job.note, job.typedFallback, job.docs || []);
+    return submitScan(job.area, job.images, job.note, job.typedFallback, job.docs || [], job.opts || {});
   }
 
   // Save one area's results now (used by the kitchen tour, area by area).
@@ -254,13 +265,7 @@ export default function App() {
     setOnboarded(true);
   }
 
-  function confirmPending() {
-    commitItems(pending);
-    setPending([]);
-    setJobs([]);
-    setOnboarded(true);
-    setScreen(reviewMode === 'addProducts' ? 'products' : reviewMode === 'add' ? 'kitchen' : 'home');
-  }
+
 
   /* ----- Meal ideas ----- */
   const getIdea = useCallback(async (avoidCurrent) => {
@@ -324,10 +329,9 @@ export default function App() {
     setScreen('home');
   }
 
-  function startTour(steps = TOUR_STEPS) {
-    setTourSteps(steps);
-    setReviewMode('tour');
-    setScreen('tour');
+  function startAdd(m = 'kitchen') {
+    setAddMode(m);
+    setScreen('add');
   }
 
   function resetAll() {
@@ -360,7 +364,7 @@ export default function App() {
     <div className="app">
       {current === 'welcome' && (
         <Welcome
-          onTour={() => startTour()}
+          onTour={() => startAdd('kitchen')}
           onSkip={() => {
             setOnboarded(true);
             setScreen('home');
@@ -368,44 +372,24 @@ export default function App() {
         />
       )}
 
-      {current === 'tour' && (
-        <Tour
-          key={tourSteps.map((s) => s.area).join()}
-          steps={tourSteps}
-          onSubmit={(area, images, note) => submitScan(area, images, note)}
+      {current === 'add' && (
+        <AddItems
+          key={addMode}
+          mode={addMode}
+          onSubmit={submitScan}
           pending={pending}
           jobs={jobs}
           onRemove={(id) => setPending((p) => p.filter((x) => x.id !== id))}
+          onUpdatePending={(id, patch) => setPending((p) => p.map((x) => (x.id === id ? { ...x, ...patch, kind: patch.area ? kindOfArea(patch.area) : x.kind } : x)))}
           onRetry={retryJob}
           onSave={saveJobs}
           onDone={() => {
+            const firstTime = !onboarded;
             setOnboarded(true);
-            setBanner('Your kitchen\u2019s saved. Tap Kitchen any time to update an area.');
-            setScreen(kindOfArea(tourSteps[0].area) === 'product' ? 'products' : tourSteps.length === 1 ? (tourSteps[0].area === 'Equipment' ? 'kit' : 'kitchen') : 'home');
+            setBanner(addMode === 'kitchen' ? 'Saved to your kitchen.' : '');
+            setScreen(addMode === 'products' ? 'products' : addMode === 'kit' ? 'kit' : firstTime ? 'home' : 'kitchen');
           }}
-          onExit={() => setScreen(kindOfArea(tourSteps[0].area) === 'product' ? 'products' : onboarded ? 'kitchen' : 'welcome')}
-        />
-      )}
-
-      {current === 'review' && (
-        <Found
-          title={reviewMode === 'addProducts' ? 'Add household products' : reviewMode === 'add' ? 'Add to your kitchen' : "Here's what I found"}
-          subtitle={
-            reviewMode === 'addProducts'
-              ? 'Scan a receipt, or say, snap or type what you\u2019ve got.'
-              : reviewMode === 'add'
-              ? 'Scan a receipt, or say, snap or type what you\u2019ve got.'
-              : `${pending.length} things from your tour. Open each section to check it.`
-          }
-          pending={pending}
-          jobs={jobs}
-          onRemove={(id) => setPending((p) => p.filter((x) => x.id !== id))}
-          onAdd={(images, note, typed) => submitScan('Auto', images, note, typed)}
-          onReceipt={reviewMode !== 'tour' ? (images, docs) => submitScan('Receipt', images, '', null, docs) : undefined}
-          onConfirm={confirmPending}
-          onRetry={retryJob}
-          onBack={reviewMode !== 'tour' ? () => setScreen(reviewMode === 'addProducts' ? 'products' : 'kitchen') : null}
-          confirmLabel={reviewMode === 'addProducts' ? 'Save products' : reviewMode === 'add' ? 'Save to my kitchen' : 'Looks right, Chef'}
+          onExit={() => setScreen(addMode === 'products' ? 'products' : addMode === 'kit' ? 'kit' : onboarded ? 'kitchen' : 'welcome')}
         />
       )}
 
@@ -426,7 +410,7 @@ export default function App() {
           onAnother={() => getIdea(true)}
           onCook={go('recipe')}
           onAddToList={(names) => addToList(names)}
-          onTour={() => startTour()}
+          onTour={() => startAdd('kitchen')}
           banner={banner}
           showUseUp={settings.useUp}
         />
@@ -438,12 +422,7 @@ export default function App() {
         <Kitchen
           stock={stock}
           onEdit={(it) => setEditing({ item: it, isKit: false })}
-          onAdd={() => {
-            setReviewMode('add');
-            setScreen('review');
-          }}
-          onTour={() => startTour()}
-          onUpdateArea={(area) => startTour([stepForArea(area)])}
+          onAdd={() => startAdd('kitchen')}
         />
       )}
 
@@ -452,12 +431,7 @@ export default function App() {
           products
           stock={products}
           onEdit={(it) => setEditing({ item: it, isKit: false, isProduct: true })}
-          onAdd={() => {
-            setReviewMode('addProducts');
-            setScreen('review');
-          }}
-          onTour={() => startTour(PRODUCT_STEPS)}
-          onUpdateArea={(area) => startTour(PRODUCT_STEPS.filter((p) => p.area === area))}
+          onAdd={() => startAdd('products')}
         />
       )}
 
@@ -469,7 +443,7 @@ export default function App() {
           onBack={go('home')}
           onEdit={(k) => setEditing({ item: k, isKit: true })}
           onAdd={(name) => setKit((k) => [...k, { id: newId(), name, note: '' }])}
-          onFilm={() => startTour([stepForArea('Equipment')])}
+          onFilm={() => startAdd('kit')}
         />
       )}
 

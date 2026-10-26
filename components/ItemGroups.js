@@ -4,7 +4,7 @@ import { Chevron, Close } from './Icons';
 
 // Two columns of line items, grouped by category (Dairy & eggs, Veg, Salad…).
 // With `collapsible`, each category folds away under a tappable header showing its count and any warnings.
-export default function ItemGroups({ items, area, onTap, onRemove, showTags = false, showCategories = true, collapsible = false, openCats = {}, onToggleCat }) {
+export default function ItemGroups({ items, area, onTap, onRemove, onSelect, showTags = false, showCategories = true, collapsible = false, openCats = {}, onToggleCat }) {
   const groups = showCategories ? groupByCategory(items, area) : [{ category: '', items }];
   return (
     <div className="groups">
@@ -53,7 +53,13 @@ export default function ItemGroups({ items, area, onTap, onRemove, showTags = fa
               }
               return (
                 <div key={it.id} className={`line${tone}`} title={it.name}>
-                  {body}
+                  {onSelect ? (
+                    <button className="line-body" onClick={() => onSelect(it)} aria-label={`Move ${it.name}`}>
+                      {body}
+                    </button>
+                  ) : (
+                    body
+                  )}
                   {onRemove && (
                     <button className="line-x" onClick={() => onRemove(it.id)} aria-label={`Remove ${it.name}`}>
                       <Close size={12} />

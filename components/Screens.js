@@ -16,12 +16,12 @@ export function Welcome({ onTour, onSkip }) {
             Hi Chef<span className="dot">!</span>
           </h1>
           <p className="lead">I'm your kitchen assistant. You cook, I'll handle the admin: what's in, what needs using up, and what to buy.</p>
-          <p className="lead">First, give me a quick tour of your kitchen. It takes about five minutes.</p>
+          <p className="lead">First, show me what you’ve got. Film, snap, talk or scan a receipt, anywhere in the house, and I’ll sort it all out.</p>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button className="btn" onClick={onTour}>
-          Show me around your kitchen
+          Show me what you’ve got
         </button>
         <button className="btn quiet" onClick={onSkip}>
           Skip for now
@@ -81,9 +81,9 @@ export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mod
       {empty ? (
         <div className="card">
           <p className="h3">Let's see what you've got</p>
-          <p className="sub">I need to know what's in your kitchen before I can suggest anything. A quick tour takes about five minutes.</p>
+          <p className="sub">I need to know what's in your kitchen before I can suggest anything. Film, snap, talk or scan a receipt.</p>
           <button className="btn" onClick={onTour}>
-            Start the kitchen tour
+            Add your first items
           </button>
         </div>
       ) : (
@@ -315,7 +315,7 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
 }
 
 /* ---------- Kitchen ---------- */
-export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea, products = false }) {
+export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false }) {
   const areas = products ? PRODUCT_AREAS : FOOD_AREAS;
   const [open, setOpen] = useState({ [areas[0]]: true });
   const [openCats, setOpenCats] = useState({});
@@ -341,10 +341,7 @@ export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea, products =
           <span><i className="grey" />Keeps</span>
         </div>
       )}
-      <div className="grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <button className="btn sm" onClick={onAdd}>{products ? 'Add products' : 'Add food'}</button>
-        <button className="btn sm ghost" onClick={onTour}>{products ? 'Products tour' : 'Kitchen tour'}</button>
-      </div>
+      <button className="btn" onClick={onAdd}>{products ? 'Add products' : 'Add items'}</button>
       {!products && <DrinksCard stock={stock} />}
       {areas.map((area) => {
         const items = stock.filter((s) => s.area === area);
@@ -498,7 +495,7 @@ export function Kit({ kit, onBack, onEdit, onAdd, onFilm }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) { onAdd(text.trim()); setText(''); } }} />
         <button className="btn sm" disabled={!text.trim()} onClick={() => { onAdd(text.trim()); setText(''); }}>Add</button>
       </div>
-      <button className="btn ghost sm" onClick={onFilm}>Film my kit instead</button>
+      <button className="btn ghost sm" onClick={onFilm}>Film or snap my kit</button>
       <div className="card orange tight">
         <p className="eyebrow orange">Oven check</p>
         <p style={{ fontSize: 15, lineHeight: 1.45 }}>Does your oven cook unevenly? The toast test finds the hot spots in five minutes.</p>

@@ -4,7 +4,7 @@ import { getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKe
 export const maxDuration = 60;
 
 const FOOD_RULES = `Return JSON only, in this shape:
-{"items":[{"name":"Chorizo","qty":"Half a ring","area":"Fridge","category":"Meat & fish","shelfDays":5,"status":null}]}
+{"items":[{"name":"Chorizo","qty":"Half a ring","area":"Fridge","category":"Meat & fish","shelfDays":5,"status":null,"seenIn":"Fridge","check":null}]}
 
 Rules:
 - One entry per distinct food. Use short, everyday British names of three words or fewer (coriander, not cilantro; "Greek yoghurt", not "Greek style natural yoghurt 500g"). Leave out brands and pack sizes.
@@ -31,6 +31,11 @@ Rules:
 - "shelfDays" is your best estimate of how many days from today it should be eaten by, for fresh or opened food. Use null for long-life things (tins, dried pasta, rice, spices, frozen food, unopened drinks and wine). An opened bottle of wine is about 3 days; opened juice about 5.
 - For wine, put the grape or style in the name when you can see it (e.g. "Rioja", "Sauvignon blanc", "Prosecco"), and "qty" like "1 bottle" or "Half a bottle (open)". For spirits, give a rough amount left, e.g. "About 50ml" or "Half a bottle".
 - For spices and dried herbs use "status": "Got it", "Low" or "Out". Otherwise "status" is null, unless the person says something is running low ("Low") or finished ("Out").
+- "seenIn" is where the item physically appears to be: "Fridge", "Freezer", "Cupboards", or null if you can't tell.
+- "area" is the item's usual home (fish fingers: Freezer; milk: Fridge; rice: Cupboards), unless you can clearly see it's been stored somewhere else on purpose.
+- "check": when an item seems to be somewhere unusual in a way that changes how long it lasts, or you can't tell whether it's fresh or frozen, ask instead of guessing. Give a short question and 2 or 3 options, each with the "area" and "shelfDays" it would mean. Example for fish fingers that look like they're in the fridge:
+  {"question":"These looked like they were in the fridge. Where are they?","options":[{"label":"Freezer","area":"Freezer","shelfDays":null},{"label":"Fridge (defrosting)","area":"Fridge","shelfDays":1}]}
+  Otherwise "check" is null. Ask rarely: only when it really matters for freshness or safety. Never ask about drinks, spices, tins or household products.
 - What the person says is the best guide to amounts and condition. Use the pictures to spot things they didn't mention.
 - For household products, "shelfDays" is null; use "status" "Low" if it looks nearly empty or they say so, "Out" if finished. "qty" like "1 bottle", "About 20 tablets", "Half a box".
 - Ignore anything that is neither food, drink nor one of those household products (people, pets, toiletries, empty packaging).
@@ -82,16 +87,22 @@ export async function POST(req) {
         ? '\n\nThese are fresh herbs, cut or growing in pots. Put them all in "Fresh herbs".'
         : '';
 
-    const productHelp = ['Cleaning', 'Washing machine', 'Dishwasher'].includes(area)
-      ? `\n\nThese are household products in their ${area.toLowerCase()} area. Read the labels (e.g. Fairy, Finish, Persil, Lenor, Dettol). Put each in "Cleaning", "Washing machine" or "Dishwasher" as fits, and say how much is left.`
+    const productHelp = ['Cleaning', 'Washing machine', 'Dishwasher', 'Products'].includes(area)
+      ? `\n\nThese are household products. Read the labels (e.g. Fairy, Finish, Persil, Lenor, Dettol). Put each in "Cleaning", "Washing machine" or "Dishwasher" as fits, and say how much is left.`
       : '';
 
+    const placeHint = { Fridge: 'the fridge', Freezer: 'the freezer', Cupboard: 'the cupboards' }[body.where] || null;
+    const isProducts = area === 'Products';
     const where = isKit
       ? 'The person is showing you their kitchen equipment.'
       : isReceipt
-      ? 'The person is showing you a shopping receipt or order.'
+      ? 'The person is showing you a shopping receipt or order. Everything was just bought, so "check" is always null and "seenIn" is null.'
+      : isProducts
+      ? 'The person is showing you their household products (cleaning, washing machine and dishwasher things). Put each in "Cleaning", "Washing machine" or "Dishwasher".'
       : area === 'Auto'
-      ? 'The person is adding things they missed. Work out which area each item belongs in.'
+      ? placeHint
+        ? `The person has told you everything here is in ${placeHint}. Use "seenIn": "${{ Fridge: 'Fridge', Freezer: 'Freezer', Cupboard: 'Cupboards' }[body.where]}" for every item, and trust it: food that can live there (e.g. meat, fish, bread or veg in the freezer) goes in that area with the right "shelfDays", without asking. Drinks, herbs, spices and household products still go in their own areas.`
+        : 'The person may be showing you any part of the house: fridge, freezer, cupboards, drinks, or household products. Work out what each item is and where it belongs.'
       : `The person is showing you their ${area.toLowerCase()}. Put items in "${area}" unless they clearly belong elsewhere.`;
     // Receipts and photos can include household products, so the person is told what was found either way.
 
