@@ -342,7 +342,6 @@ export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false }
         </div>
       )}
       <button className="btn" onClick={onAdd}>{products ? 'Add products' : 'Add items'}</button>
-      {!products && <DrinksCard stock={stock} />}
       {areas.map((area) => {
         const items = stock.filter((s) => s.area === area);
         const flagged = items.filter(needsAttention).length;
