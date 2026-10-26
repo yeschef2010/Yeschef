@@ -35,10 +35,10 @@ export default function ItemGroups({ items, area, onTap, onRemove, showTags = fa
               const body = (
                 <span className="txt">
                   <span className="name">{it.name}</span>
-                  {(sub || tag) && (
+                  {(sub || (tag && tag.cls !== 'grey')) && (
                     <span className="qty-row">
                       {sub && <span className="qty">{sub}</span>}
-                      {tag && <span className="days">{sub ? ' · ' : ''}{tag.label}</span>}
+                      {tag && tag.cls !== 'grey' && <span className="days">{sub ? ' · ' : ''}{tag.label}</span>}
                     </span>
                   )}
                 </span>

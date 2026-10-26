@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
-import { FOOD_AREAS, MEALS, TOUR_STEPS, dateLine, daysLeft, mealForHour, migrateArea, stepForArea, todayKey } from '@/lib/helpers';
+import { FOOD_AREAS, MEALS, TOUR_STEPS, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, stepForArea, todayKey } from '@/lib/helpers';
 import Tour from './Tour';
 import Found from './Found';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
@@ -34,6 +34,7 @@ function normaliseFood(it, fallbackArea) {
     shelfDays: typeof it.shelfDays === 'number' ? it.shelfDays : null,
     status,
     category: typeof it.category === 'string' ? it.category : null,
+    seenIn: fallbackArea || null,
     addedAt: Date.now(),
   };
 }
@@ -65,8 +66,19 @@ export default function App() {
   useEffect(() => {
     if (!mounted) return;
     setStock((s) => {
-      const next = s.map(migrateArea);
-      return next.some((x, i) => x !== s[i]) ? next : s;
+      const moved = s.map(migrateArea);
+      if (!moved.some((x, i) => x !== s[i])) return s;
+      // If the same thing now sits in one area twice (e.g. sparkling water from the fridge and the cupboard), combine them.
+      const out = [];
+      moved.forEach((it) => {
+        const j = out.findIndex((o) => o.area === it.area && o.name.toLowerCase() === it.name.toLowerCase());
+        if (j < 0) return out.push(it);
+        const a = out[j].locations || { main: out[j].qty };
+        const b = it.locations || { main: it.qty };
+        const locations = { ...a, ...Object.fromEntries(Object.entries(b).filter(([k]) => !(k in a))) };
+        out[j] = { ...out[j], locations, qty: qtyFromLocations(locations) };
+      });
+      return out;
     });
   }, [mounted, setStock]);
 
@@ -112,10 +124,19 @@ export default function App() {
       setStock((s) => {
         const next = [...s];
         food.forEach((f) => {
-          const { kind, job, ...item } = f;
+          const { kind, job, seenIn, ...item } = f;
+          // File by what it is, but remember where it was seen: a bottle in the fridge
+          // adds "1 chilled" rather than replacing the six in the cupboard.
+          const key = locationKey(seenIn, item.area);
           const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase() && x.area === item.area);
-          if (i >= 0) next[i] = { ...next[i], ...item, id: next[i].id };
-          else next.push(item);
+          if (i >= 0) {
+            const prev = next[i];
+            const locations = { ...(prev.locations || { main: prev.qty }), [key]: item.qty };
+            next[i] = { ...prev, ...item, id: prev.id, locations, qty: qtyFromLocations(locations) };
+          } else {
+            const locations = { [key]: item.qty };
+            next.push({ ...item, locations, qty: qtyFromLocations(locations) });
+          }
         });
         return next;
       });

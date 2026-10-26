@@ -9,10 +9,12 @@ const FOOD_RULES = `Return JSON only, in this shape:
 Rules:
 - One entry per distinct food. Use short, everyday British names of three words or fewer (coriander, not cilantro; "Greek yoghurt", not "Greek style natural yoghurt 500g"). Leave out brands and pack sizes.
 - "qty" is a short, friendly amount: "2 tins", "Half a bag", "About 200g", "6".
-- "area" is one of: "Fridge", "Cupboards", "Fresh herbs", "Spice rack", "Freezer", "Drinks", "Wine".
-  Fresh herbs (basil, coriander, parsley, herb pots) always go in "Fresh herbs", wherever they're kept.
-  Non-alcoholic drinks (juice, squash, fizzy drinks, water, tea, coffee, alcohol-free beer or wine) go in "Drinks". Milk stays in "Fridge".
-  Wine, beer, cider and spirits go in "Wine".
+- "area" is one of: "Fridge", "Freezer", "Cupboards", "Spice rack", "Fresh herbs", "Drinks", "Wine", "Spirits".
+  File each item by WHAT IT IS, not where you happened to see it. The app remembers it was in the fridge.
+  Fresh herbs (basil, coriander, parsley, herb pots) always go in "Fresh herbs".
+  Non-alcoholic drinks and mixers (juice, squash, fizzy drinks, sparkling or still water, tonic, tea, coffee, alcohol-free beer or wine) go in "Drinks". Milk stays in "Fridge".
+  Wine, beer and cider go in "Wine". Spirits and liqueurs (gin, vodka, whisky, rum, Aperol, Baileys) go in "Spirits".
+  Fruit used for drinks, like lemons and limes, stays in "Fridge".
 - "category" groups similar things together. Pick one from the list for that area:
   Fridge: ${AREA_CATEGORIES.Fridge.join(', ')}
   Cupboards: ${AREA_CATEGORIES.Cupboards.join(', ')}
@@ -21,8 +23,9 @@ Rules:
   Freezer: ${AREA_CATEGORIES.Freezer.join(', ')}
   Drinks: ${AREA_CATEGORIES.Drinks.join(', ')}
   Wine: ${AREA_CATEGORIES.Wine.join(', ')}
+  Spirits: ${AREA_CATEGORIES.Spirits.join(', ')}
 - "shelfDays" is your best estimate of how many days from today it should be eaten by, for fresh or opened food. Use null for long-life things (tins, dried pasta, rice, spices, frozen food, unopened drinks and wine). An opened bottle of wine is about 3 days; opened juice about 5.
-- For wine, put the grape or style in the name when you can see it (e.g. "Rioja", "Sauvignon blanc", "Prosecco"), and "qty" like "1 bottle" or "Half a bottle (open)".
+- For wine, put the grape or style in the name when you can see it (e.g. "Rioja", "Sauvignon blanc", "Prosecco"), and "qty" like "1 bottle" or "Half a bottle (open)". For spirits, give a rough amount left, e.g. "About 50ml" or "Half a bottle".
 - For spices and dried herbs use "status": "Got it", "Low" or "Out". Otherwise "status" is null, unless the person says something is running low ("Low") or finished ("Out").
 - What the person says is the best guide to amounts and condition. Use the pictures to spot things they didn't mention.
 - Ignore things that aren't food or drink (people, pets, packaging with nothing in it).
@@ -57,7 +60,7 @@ export async function POST(req) {
       ? `\n\nThis is a supermarket receipt or an online grocery order (Tesco, Sainsbury\u2019s, Asda, Aldi, Lidl, Morrisons, Waitrose, Ocado and so on), bought today.
 - Turn shortened receipt names into plain food names (e.g. "TSCO FF CHKN THGH 1KG" is "Chicken thighs", qty "1kg").
 - Use the quantity on the line (e.g. "2 x" means 2).
-- Put each item in the area it\u2019s normally kept (frozen food goes in Freezer, fresh herbs in Fresh herbs, soft drinks in Drinks, alcohol in Wine).
+- Put each item in the area for what it is (frozen food in Freezer, fresh herbs in Fresh herbs, soft drinks and mixers in Drinks, wine and beer in Wine, spirits in Spirits).
 - Estimate "shelfDays" from today for fresh food as if just bought (e.g. fresh chicken 2\u20133, milk 7, bagged salad 4, carrots 14).
 - Skip anything that isn\u2019t food or drink (bags, cleaning, toiletries, nappies), and skip totals, savings, Clubcard or Nectar lines, and unavailable items.`
       : '';
@@ -68,8 +71,8 @@ export async function POST(req) {
         : '';
 
     const drinksHelp =
-      area === 'Drinks' || area === 'Wine'
-        ? '\n\nThis is their drinks: soft drinks, juice and squash go in "Drinks"; wine, beer, cider and spirits go in "Wine". Read bottle labels where you can.'
+      area === 'Drinks' || area === 'Wine' || area === 'Spirits'
+        ? '\n\nThis is their drinks: soft drinks, mixers, juice and squash go in "Drinks"; wine, beer and cider go in "Wine"; spirits and liqueurs go in "Spirits". Read bottle labels where you can.'
         : area === 'Fresh herbs'
         ? '\n\nThese are fresh herbs, cut or growing in pots. Put them all in "Fresh herbs".'
         : '';

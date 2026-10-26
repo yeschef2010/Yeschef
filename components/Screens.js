@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AREA_CATEGORIES, FOOD_AREAS, MEALS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
+import { drinksYouCanMake } from '@/lib/drinks';
 
 /* ---------- Welcome ---------- */
 export function Welcome({ onTour, onSkip }) {
@@ -26,6 +27,29 @@ export function Welcome({ onTour, onSkip }) {
           Skip for now
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Drinks you can make from what's in ---------- */
+export function DrinksCard({ stock, title = 'Ready to pour' }) {
+  const drinks = drinksYouCanMake(stock);
+  if (drinks.length === 0) return null;
+  return (
+    <div className="card tight sage" style={{ flexShrink: 0 }}>
+      <p className="eyebrow" style={{ color: 'var(--forest)' }}>{title}</p>
+      {drinks.map((d) => (
+        <div key={d.name} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <p style={{ fontSize: 16, fontWeight: 800 }}>
+            {d.name}
+            {d.alcoholFree ? <span style={{ fontWeight: 600, fontSize: 13 }}> · alcohol-free</span> : null}
+          </p>
+          <p style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--text-2)' }}>
+            {listJoin(d.items.map((i) => (i.qty ? `${i.name.toLowerCase()} (${i.qty.toLowerCase()})` : i.name.toLowerCase())))}
+            {d.garnish ? `, with ${d.garnish.name.toLowerCase()} for the glass` : ''}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -138,6 +162,7 @@ export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mod
               </>
             )}
           </div>
+          {mealKey === 'dinner' && <DrinksCard stock={stock} title="And to drink, you’ve got everything for" />}
         </>
       )}
     </div>
@@ -221,6 +246,7 @@ export function EditSheet({ item, isKit, onSave, onRemove, onClose }) {
       ...item,
       name: name.trim() || item.name,
       qty,
+      locations: { main: qty },
       area,
       status: status || null,
       category: (AREA_CATEGORIES[area] || []).includes(category) ? category : null,
@@ -308,6 +334,7 @@ export function Kitchen({ stock, onEdit, onAdd, onTour, onUpdateArea }) {
         <button className="btn sm" onClick={onAdd}>Add food</button>
         <button className="btn sm ghost" onClick={onTour}>Kitchen tour</button>
       </div>
+      <DrinksCard stock={stock} />
       {FOOD_AREAS.map((area) => {
         const items = stock.filter((s) => s.area === area);
         const flagged = items.filter(needsAttention).length;
