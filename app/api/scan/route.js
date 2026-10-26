@@ -4,11 +4,15 @@ import { getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKe
 export const maxDuration = 60;
 
 const FOOD_RULES = `Return JSON only, in this shape:
-{"items":[{"name":"Chorizo","qty":"Half a ring","area":"Fridge","category":"Meat & fish","shelfDays":5,"status":null,"seenIn":"Fridge","check":null}]}
+{"items":[{"name":"Chorizo","qty":"Half a ring","amount":{"n":110,"unit":"g"},"pack":{"n":225,"unit":"g"},"area":"Fridge","category":"Meat & fish","shelfDays":5,"status":null,"seenIn":"Fridge","check":null}]}
 
 Rules:
 - One entry per distinct food. Use short, everyday British names of three words or fewer (coriander, not cilantro; "Greek yoghurt", not "Greek style natural yoghurt 500g"). Leave out brands and pack sizes.
 - "qty" is a short, friendly amount: "2 tins", "Half a bag", "About 200g", "6".
+- "amount" is the same amount as a number the app can add up and take off: {"n": number, "unit": "g" | "ml" | "each", "word": "tins"}.
+  Use the unit a recipe would use: meat, cheese, pasta, rice, flour, loose veg by weight in "g"; milk, cream, juice, oil, spirits in "ml"; things you count (eggs, onions, tins, jars, bottles of wine, cans, yoghurt pots, tablets) as "each" with "word" naming them ("eggs", "tins", "bottles").
+  Give your honest best estimate (half of a 1kg bag of rice is {"n":500,"unit":"g"}). Use null only if you really can't say.
+- "pack" is the size of one pack when you know it (a 2.272 litre bottle of milk is {"n":2272,"unit":"ml"}), otherwise null.
 - "area" is one of: "Fridge", "Freezer", "Cupboards", "Spice rack", "Fresh herbs", "Drinks", "Wine", "Spirits", "Cleaning", "Washing machine", "Dishwasher".
   File each item by WHAT IT IS, not where you happened to see it. The app remembers it was in the fridge.
   Fresh herbs (basil, coriander, parsley, herb pots) always go in "Fresh herbs".
@@ -69,7 +73,7 @@ export async function POST(req) {
     const receiptHelp = isReceipt
       ? `\n\nThis is a supermarket receipt or an online grocery order (Tesco, Sainsbury\u2019s, Asda, Aldi, Lidl, Morrisons, Waitrose, Ocado and so on), bought today.
 - Turn shortened receipt names into plain food names (e.g. "TSCO FF CHKN THGH 1KG" is "Chicken thighs", qty "1kg").
-- Use the quantity on the line (e.g. "2 x" means 2).
+- Use the quantity on the line (e.g. "2 x" means 2). "amount" is the total bought: 2 x 2.272L milk is {"n":4544,"unit":"ml"} with "pack" {"n":2272,"unit":"ml"}; 2 x 400g tins of tomatoes is {"n":2,"unit":"each","word":"tins"} with "pack" {"n":400,"unit":"g"}. Loose veg sold by weight (0.62kg) is in "g".
 - Put each item in the area for what it is (frozen food in Freezer, fresh herbs in Fresh herbs, soft drinks and mixers in Drinks, wine and beer in Wine, spirits in Spirits).
 - Estimate "shelfDays" from today for fresh food as if just bought (e.g. fresh chicken 2\u20133, milk 7, bagged salad 4, carrots 14).
 - Include cleaning, laundry and dishwasher products in their areas. Skip toiletries, nappies, carrier bags, totals, savings, Clubcard or Nectar lines, and unavailable items.`
@@ -91,6 +95,10 @@ export async function POST(req) {
       ? `\n\nThese are household products. Read the labels (e.g. Fairy, Finish, Persil, Lenor, Dettol). Put each in "Cleaning", "Washing machine" or "Dishwasher" as fits, and say how much is left.`
       : '';
 
+    const known = (Array.isArray(body.known) ? body.known : []).map((k) => String(k).slice(0, 60)).slice(0, 400);
+    const knownHelp = known.length && !isKit
+      ? `\n\nThings already in their kitchen:\n${known.join('; ')}\nIf something you find is the same thing as one of these (e.g. "TESCO SEMI SKIM MILK" and "Milk"), use that exact name so it adds to it instead of making a duplicate. Only reuse a name if it is genuinely the same food.`
+      : '';
     const placeHint = { Fridge: 'the fridge', Freezer: 'the freezer', Cupboard: 'the cupboards' }[body.where] || null;
     const isProducts = area === 'Products';
     const where = isKit
@@ -111,7 +119,7 @@ export async function POST(req) {
       ...images,
       {
         type: 'text',
-        text: `${where}${spiceHelp}${drinksHelp}${productHelp}${receiptHelp}\n\n${images.length || docs.length ? `There are ${images.length + docs.length} picture(s) or file(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
+        text: `${where}${spiceHelp}${drinksHelp}${productHelp}${receiptHelp}${knownHelp}\n\n${images.length || docs.length ? `There are ${images.length + docs.length} picture(s) or file(s) above.` : 'There are no pictures.'}\n\nWhat they said or typed:\n"""${note || '(nothing)'}"""\n\n${isKit ? KIT_RULES : FOOD_RULES}`,
       },
     ];
 

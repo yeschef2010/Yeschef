@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
+import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, totalOf } from '@/lib/amounts';
 import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
 import AddItems from './Tour';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
@@ -33,6 +34,7 @@ function cleanCheck(c, areas) {
 }
 
 function normaliseFood(it, fallbackArea, where) {
+  const amount = normAmount(it.amount) || parseQty(it.qty);
   const ALL = [...FOOD_AREAS, ...PRODUCT_AREAS];
   const area = ALL.includes(it.area) ? it.area : ALL.includes(fallbackArea) ? fallbackArea : 'Cupboards';
   let status = it.status || null;
@@ -40,15 +42,58 @@ function normaliseFood(it, fallbackArea, where) {
   return {
     id: newId(),
     name: String(it.name || '').trim(),
-    qty: String(it.qty || '').trim(),
+    qty: String(it.qty || '').trim() || (amount ? formatAmount(amount) : ''),
+    amount,
+    pack: normAmount(it.pack),
+    // A receipt is new shopping, so it adds to what's there. Anything filmed or snapped is what's there now.
+    source: fallbackArea === 'Receipt' ? 'receipt' : 'seen',
     area,
     shelfDays: typeof it.shelfDays === 'number' ? it.shelfDays : null,
     status,
     category: typeof it.category === 'string' ? it.category : null,
     // Where it physically is: what the person told us, what the AI saw, or the area being scanned.
-    seenIn: PHYSICAL[where] || PHYSICAL[it.seenIn] || fallbackArea || null,
+    seenIn: fallbackArea === 'Receipt' ? null : PHYSICAL[where] || PHYSICAL[it.seenIn] || fallbackArea || null,
     check: cleanCheck(it.check, ALL),
     addedAt: Date.now(),
+  };
+}
+
+// Put one found item into a list: update the same thing if it's already there, otherwise add it.
+function mergeItem(next, f) {
+  const { kind, job, seenIn, check, source, amount, pack, ...item } = f;
+  const key = locationKey(seenIn, item.area);
+  const here = amount || item.qty;
+  const i = findSame(next, item);
+  if (i < 0) {
+    const locations = { [key]: here };
+    next.push({ ...item, pack: pack || null, locations, qty: qtyFromLocations(locations) });
+    return;
+  }
+  const prev = next[i];
+  const locations = { ...(prev.locations || { main: prev.qty }) };
+  if (source === 'receipt') {
+    // New shopping adds to what's already in. If the old amount was just words ("half a bag"), keep both.
+    const old = locations[key];
+    const sum = old == null ? parseQty(here) : addAmounts(old, here);
+    locations[key] = sum || (old ? `${typeof here === 'object' ? formatAmount(here) : here} + ${typeof old === 'object' ? formatAmount(old) : old}` : here);
+  } else {
+    locations[key] = here;
+  }
+  // Keep the older use-by if it's sooner: the old pint still needs drinking first.
+  const prevLeft = daysLeft(prev);
+  const newLeft = daysLeft(item);
+  const keepOld = source === 'receipt' && prevLeft != null && (newLeft == null || prevLeft < newLeft);
+  next[i] = {
+    ...prev,
+    ...item,
+    name: prev.name,
+    id: prev.id,
+    category: prev.category || item.category,
+    ...(keepOld ? { shelfDays: prev.shelfDays, addedAt: prev.addedAt } : {}),
+    status: source === 'receipt' ? null : item.status,
+    pack: pack || prev.pack || null,
+    locations,
+    qty: qtyFromLocations(locations),
   };
 }
 
@@ -137,33 +182,14 @@ export default function App() {
     if (productItems.length) {
       setProducts((ps) => {
         const next = [...ps];
-        productItems.forEach((f) => {
-          const { kind, job, seenIn, locations, check, ...item } = f;
-          const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase() && x.area === item.area);
-          if (i >= 0) next[i] = { ...next[i], ...item, id: next[i].id };
-          else next.push(item);
-        });
+        productItems.forEach((f) => mergeItem(next, { ...f, seenIn: null }));
         return next;
       });
     }
     if (food.length) {
       setStock((s) => {
         const next = [...s];
-        food.forEach((f) => {
-          const { kind, job, seenIn, check, ...item } = f;
-          // File by what it is, but remember where it was seen: a bottle in the fridge
-          // adds "1 chilled" rather than replacing the six in the cupboard.
-          const key = locationKey(seenIn, item.area);
-          const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase() && x.area === item.area);
-          if (i >= 0) {
-            const prev = next[i];
-            const locations = { ...(prev.locations || { main: prev.qty }), [key]: item.qty };
-            next[i] = { ...prev, ...item, id: prev.id, locations, qty: qtyFromLocations(locations) };
-          } else {
-            const locations = { [key]: item.qty };
-            next.push({ ...item, locations, qty: qtyFromLocations(locations) });
-          }
-        });
+        food.forEach((f) => mergeItem(next, f));
         return next;
       });
     }
@@ -182,6 +208,10 @@ export default function App() {
     if (food.length || kitItems.length) setIdeas({});
   }, [setStock, setKit, setProducts, setIdeas]);
 
+  // Names already in the kitchen, so the AI reuses them rather than making duplicates.
+  const knownNames = useRef([]);
+  knownNames.current = [...stock, ...products].map((s) => s.name);
+
   // Jobs whose results should go straight into the kitchen when they arrive.
   const autoSave = useRef(new Set());
 
@@ -196,7 +226,7 @@ export default function App() {
     docs.forEach((d) => batches.push({ images: [], docs: [d] }));
     if (batches.length === 0) batches.push({ images: [], docs: [] });
 
-    Promise.allSettled(batches.map((b) => postJson('/api/scan', { area, images: b.images, docs: b.docs, note, where: opts.where || null })))
+    Promise.allSettled(batches.map((b) => postJson('/api/scan', { area, images: b.images, docs: b.docs, note, where: opts.where || null, known: knownNames.current })))
       .then((results) => {
         const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
         if (ok.length === 0) throw results[0].reason || new Error(FRIENDLY_FAIL);
@@ -271,7 +301,7 @@ export default function App() {
   const getIdea = useCallback(async (avoidCurrent) => {
     setIdeaState('loading');
     setIdeaError('');
-    const stockForAi = stock.map((s) => ({ name: s.name, qty: s.qty, area: s.area, daysLeft: daysLeft(s), status: s.status }));
+    const stockForAi = stock.map((s) => ({ name: s.name, qty: ((t) => (t ? `${s.qty}; ${t.n} ${t.unit === 'each' ? t.word || 'each' : t.unit} in total` : s.qty))(totalOf(s)), area: s.area, daysLeft: daysLeft(s), status: s.status }));
     const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
     const weekend = now.getDay() === 0 || now.getDay() === 6;
     try {
@@ -311,10 +341,29 @@ export default function App() {
     setBanner(`Added ${names.length === 1 ? names[0].toLowerCase() : `${names.length} things`} to your shopping list.`);
   }
 
-  function cooked() {
-    const used = new Set((idea.usedUp || []).map((u) => u.toLowerCase()));
-    const gone = stock.filter((s) => used.has(s.name.toLowerCase()));
-    setStock((s) => s.filter((x) => !used.has(x.name.toLowerCase())));
+  function cooked(changes = []) {
+    const byId = new Map(changes.map((c) => [c.id, c]));
+    setStock((list) =>
+      list.flatMap((x) => {
+        const c = byId.get(x.id);
+        if (!c) return [x];
+        if (c.action === 'all') return [];
+        const locations = takeFrom(x, c.use);
+        if (!locations) return [x];
+        if (Object.keys(locations).length === 0) return [];
+        return [{ ...x, locations, qty: qtyFromLocations(locations) }];
+      })
+    );
+    // Work out the message from the plan (setStock runs later).
+    const msgTaken = [];
+    const msgDone = [];
+    changes.forEach((c) => {
+      const x = stock.find((s) => s.id === c.id);
+      if (!x) return;
+      const left = c.action === 'take' ? takeFrom(x, c.use) : null;
+      if (c.action === 'all' || (left && Object.keys(left).length === 0)) msgDone.push(x.name);
+      else if (left) msgTaken.push(`${formatAmount(c.use)} of ${x.name.toLowerCase()}`);
+    });
     setIdeas((all) => {
       const next = { ...all };
       delete next[ideaKey];
@@ -322,8 +371,8 @@ export default function App() {
     });
     autoTried.current[ideaKey] = true;
     setBanner(
-      gone.length
-        ? `Nice one, Chef. I've taken ${gone.map((g) => g.name).join(', ')} off your stock.`
+      msgTaken.length || msgDone.length
+        ? `Nice one, Chef. ${[msgTaken.length ? `Taken off ${msgTaken.join(', ')}.` : '', msgDone.length ? `Finished: ${msgDone.join(', ')}.` : ''].filter(Boolean).join(' ')}`
         : 'Nice one, Chef. Tap Kitchen if anything else needs updating.'
     );
     setScreen('home');
@@ -416,7 +465,7 @@ export default function App() {
         />
       )}
 
-      {current === 'recipe' && <Recipe idea={idea} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n)} />}
+      {current === 'recipe' && <Recipe idea={idea} stock={stock} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n)} />}
 
       {current === 'kitchen' && (
         <Kitchen

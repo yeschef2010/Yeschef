@@ -4,6 +4,7 @@ import { AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, category
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
+import { parseQty, formatAmount, totalOf, subtractAmounts, findSame } from '@/lib/amounts';
 
 /* ---------- Welcome ---------- */
 export function Welcome({ onTour, onSkip }) {
@@ -170,7 +171,87 @@ export function Home({ mealKey, dateText, stock, idea, ideaState, ideaError, mod
 }
 
 /* ---------- Recipe ---------- */
-export function Recipe({ idea, onBack, onCooked, onAddToList }) {
+// Work out what cooking this recipe takes off the stock.
+function cookPlan(idea, stock) {
+  const usedUp = new Set((idea.usedUp || []).map((u) => String(u).toLowerCase()));
+  const rows = [];
+  const seen = new Set();
+  for (const ing of idea.ingredients || []) {
+    if (!ing.inStock && !ing.stockName) continue;
+    const want = String(ing.stockName || ing.name).toLowerCase();
+    let item = stock.find((s) => s.name.toLowerCase() === want);
+    if (!item) {
+      const areas = [...new Set(stock.map((s) => s.area))];
+      for (const area of areas) {
+        const i = findSame(stock.filter((s) => s.area === area), { name: ing.stockName || ing.name, area });
+        if (i >= 0) {
+          item = stock.filter((s) => s.area === area)[i];
+          break;
+        }
+      }
+    }
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
+    const use = parseQty(ing.use);
+    const total = totalOf(item);
+    const after = use && total ? subtractAmounts(total, use) : null;
+    const choice = usedUp.has(item.name.toLowerCase()) || (after && after.n <= 0) ? 'all' : after ? 'take' : 'keep';
+    rows.push({ item, use, after, choice });
+  }
+  return rows;
+}
+
+function CookedSheet({ idea, stock, onConfirm, onClose }) {
+  const [rows, setRows] = useState(() => cookPlan(idea, stock));
+  const pick = (id, choice) => setRows((r) => r.map((x) => (x.item.id === id ? { ...x, choice } : x)));
+  return (
+    <div className="overlay">
+      <button className="backdrop" aria-label="Close" onClick={onClose} />
+      <div className="sheet" role="dialog" aria-label="Update my kitchen">
+        <div className="row between">
+          <p className="h3">Nice one, Chef. What did you use?</p>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <Close />
+          </button>
+        </div>
+        {rows.length === 0 && <p className="sub">Nothing from your kitchen to take off for this one.</p>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '55vh', overflowY: 'auto' }}>
+          {rows.map(({ item, use, after, choice }) => {
+            const options = [
+              ...(use && after && after.n > 0 ? [['take', `Take off ${formatAmount(use)}`]] : []),
+              ['all', 'Used it all'],
+              ['keep', use && after ? 'Didn’t use it' : 'Some left'],
+            ];
+            return (
+              <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <p style={{ fontSize: 16, fontWeight: 700 }}>
+                  {item.name}
+                  <span className="small" style={{ fontWeight: 600, color: 'var(--muted)' }}>
+                    {' '}
+                    · {choice === 'take' && after ? `${item.qty || 'some'} → ${formatAmount(after, totalOf(item))} left` : choice === 'all' ? 'finished' : `keeping ${item.qty || 'it'}`}
+                  </span>
+                </p>
+                <div className="where" role="group" aria-label={`${item.name} used`}>
+                  {options.map(([k, label]) => (
+                    <button key={k} className="chip" aria-pressed={choice === k} onClick={() => pick(item.id, k)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button className="btn" onClick={() => onConfirm(rows.filter((r) => r.choice !== 'keep').map((r) => ({ id: r.item.id, action: r.choice, use: r.use })))}>
+          Update my kitchen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList }) {
+  const [cooking, setCooking] = useState(false);
   if (!idea) return null;
   return (
     <div className="screen">
@@ -220,9 +301,10 @@ export function Recipe({ idea, onBack, onCooked, onAddToList }) {
           </div>
         ))}
       </div>
-      <button className="btn" onClick={onCooked}>
+      <button className="btn" onClick={() => setCooking(true)}>
         Cooked it, update my kitchen
       </button>
+      {cooking && <CookedSheet idea={idea} stock={stock} onClose={() => setCooking(false)} onConfirm={(changes) => { setCooking(false); onCooked(changes); }} />}
     </div>
   );
 }
@@ -246,7 +328,7 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
       ...item,
       name: name.trim() || item.name,
       qty,
-      locations: { main: qty },
+      locations: { main: parseQty(qty) || qty },
       area,
       status: status || null,
       category: (AREA_CATEGORIES[area] || []).includes(category) ? category : null,

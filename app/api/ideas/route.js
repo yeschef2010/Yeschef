@@ -8,7 +8,7 @@ const SHAPE = `Return JSON only, in this shape:
   "time": "15 mins",
   "tag": "One pan, hob only",
   "why": "Uses up your chorizo and yoghurt before they go off.",
-  "ingredients": [{"name": "Chorizo", "amount": "Half a ring", "inStock": true}],
+  "ingredients": [{"name": "Chorizo", "amount": "Half a ring (110g)", "inStock": true, "stockName": "Chorizo", "use": {"n": 110, "unit": "g"}}],
   "missing": ["Fresh basil"],
   "steps": ["Slice the chorizo and fry for 3 minutes."],
   "usedUp": ["Chorizo"],
@@ -51,7 +51,9 @@ Rules:
 - Mostly use what they have. Need at most 2 missing items, ideally 0. Salt, pepper and cooking oil are always available.
 - Only use equipment they have. If the oven has a quirk, put a short warning in "tip", otherwise "tip" is "".
 - "ingredients" lists every ingredient with an amount for the household; "inStock" is true if it's in their stock.
+- For each ingredient from their stock, "stockName" is the stock item's name exactly as written above, and "use" is how much of it the recipe uses as {"n": number, "unit": "g" | "ml" | "each", "word": "tins"}, in the same unit as their stock amount where you can (if they have "2 pints" of milk, use ml; if "6 eggs", use each). Don't use more than they have. For ingredients not in stock, "stockName" and "use" are null.
 - "usedUp" lists stock item names (exactly as written above) that this meal will finish completely.
+- Never take salt, pepper or cooking oil off their stock.
 - Steps: 3 to 6 short, clear steps in British English, with temperatures in °C.
 
 ${SHAPE}`;
