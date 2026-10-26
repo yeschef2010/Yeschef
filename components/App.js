@@ -121,10 +121,10 @@ export default function App() {
           });
         const mapped =
           kind === 'kit'
-            ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', kind: 'kit' }))
-            : items.map((it) => ({ ...normaliseFood(it, area), kind: 'food' }));
+            ? items.map((it) => ({ id: newId(), name: String(it.name).trim(), note: String(it.note || '').trim(), area: 'Equipment', kind: 'kit', job: id }))
+            : items.map((it) => ({ ...normaliseFood(it, area), kind: 'food', job: id }));
         if (mapped.length === 0 && typedFallback) {
-          mapped.push({ ...normaliseFood({ name: typedFallback }, 'Cupboards'), kind: 'food' });
+          mapped.push({ ...normaliseFood({ name: typedFallback }, 'Cupboards'), kind: 'food', job: id });
         }
         if (mapped.length === 0) {
           const where = area === 'Auto' ? 'those' : `your ${area.toLowerCase()}`;
@@ -146,11 +146,12 @@ export default function App() {
         }
         setJobs((j) => j.map((x) => (x.id === id ? { ...x, state: 'error', message: e.message || FRIENDLY_FAIL } : x)));
       });
+    return id;
   }, [setPending]);
 
   function retryJob(job) {
     setJobs((j) => j.filter((x) => x.id !== job.id));
-    submitScan(job.area, job.images, job.note, job.typedFallback);
+    return submitScan(job.area, job.images, job.note, job.typedFallback);
   }
 
   function confirmPending() {
@@ -159,7 +160,7 @@ export default function App() {
     setStock((s) => {
       const next = [...s];
       food.forEach((f) => {
-        const { kind, ...item } = f;
+        const { kind, job, ...item } = f;
         const i = next.findIndex((x) => x.name.toLowerCase() === item.name.toLowerCase() && x.area === item.area);
         if (i >= 0) next[i] = { ...next[i], ...item, id: next[i].id };
         else next.push(item);
@@ -293,6 +294,10 @@ export default function App() {
           key={tourSteps.map((s) => s.area).join()}
           steps={tourSteps}
           onSubmit={(area, images, note) => submitScan(area, images, note)}
+          pending={pending}
+          jobs={jobs}
+          onRemove={(id) => setPending((p) => p.filter((x) => x.id !== id))}
+          onRetry={retryJob}
           onDone={() => setScreen('review')}
           onExit={() => setScreen(onboarded ? 'kitchen' : 'welcome')}
         />

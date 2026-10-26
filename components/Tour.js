@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TOUR_STEPS } from '@/lib/helpers';
 import { PHOTO_SIDE, fileToSmallJpeg, framesFromVideoFile, grabFrame } from '@/lib/media';
 import { createListener, speechSupported } from '@/lib/speech';
-import { Back, Camera, Mic, Video } from './Icons';
+import { Back, Camera, Close, Mic, Video } from './Icons';
 
 const MAX_FRAMES = 10;
 
@@ -14,7 +14,7 @@ function lastWords(text, n = 2) {
   return words.length > 14 ? ['…' + words.slice(-14).join(' ')] : text ? [text] : [];
 }
 
-export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
+export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit, pending = [], jobs = [], onRemove, onRetry }) {
   const [idx, setIdx] = useState(0);
   const [mode, setMode] = useState('video');
   const [images, setImages] = useState([]);
@@ -24,6 +24,9 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
   const [camError, setCamError] = useState('');
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [phase, setPhase] = useState('capture'); // 'capture' | 'review'
+  const [reviewJob, setReviewJob] = useState(null);
+  const [stepJobs, setStepJobs] = useState([]);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -36,7 +39,7 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
   const step = steps[idx];
   const isLast = idx === steps.length - 1;
   const canSpeak = speechSupported();
-  const needsCam = mode === 'video' || mode === 'photo';
+  const needsCam = phase === 'capture' && (mode === 'video' || mode === 'photo');
   const [flash, setFlash] = useState(false);
 
   function snap() {
@@ -152,16 +155,27 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
     setBusy(false);
   }
 
-  function next() {
+  // Send this area off to be read, then show what was found before moving on.
+  function check() {
     const finalNote = listenerRef.current ? listenerRef.current.stop() || note : note;
     stopRecording();
-    if (imagesRef.current.length || (finalNote || '').trim()) {
-      onSubmit(step.area, imagesRef.current, finalNote || '');
-    }
+    const hasSomething = imagesRef.current.length || (finalNote || '').trim();
+    const jobId = hasSomething ? onSubmit(step.area, imagesRef.current, finalNote || '') : null;
     setImages([]);
     setNote('');
     setInterim('');
     setMode('video');
+    if (jobId) {
+      setReviewJob(jobId);
+      setStepJobs((j) => [...j, jobId]);
+      setPhase('review');
+    } else advance();
+  }
+
+  function advance() {
+    setPhase('capture');
+    setReviewJob(null);
+    setStepJobs([]);
     if (isLast) {
       stopEverything();
       onDone();
@@ -170,6 +184,10 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
 
   function back() {
     stopRecording();
+    if (phase === 'review') {
+      setPhase('capture');
+      return;
+    }
     setImages([]);
     setNote('');
     setMode('video');
@@ -223,6 +241,26 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
         </div>
       )}
 
+      {phase === 'review' && (
+        <Review
+          area={step.area}
+          job={jobs.find((j) => j.id === reviewJob)}
+          items={pending.filter((p) => stepJobs.includes(p.job))}
+          onRemove={onRemove}
+          onRetry={(job) => {
+            const id = onRetry(job);
+            setReviewJob(id);
+            setStepJobs((j) => [...j, id]);
+          }}
+          onMore={() => setPhase('capture')}
+          onNext={advance}
+          nextLabel={isLast ? 'Looks right, finish' : `Looks right, next: ${steps[idx + 1].area.toLowerCase()}`}
+          busyLabel={isLast ? 'Finish, I’ll keep reading' : `Next: ${steps[idx + 1].area.toLowerCase()}, I’ll keep reading`}
+        />
+      )}
+
+      {phase === 'capture' && (
+      <>
       <div className="camera">
         {needsCam && !camError && <video ref={videoRef} playsInline muted autoPlay />}
         {flash && <div style={{ position: 'absolute', inset: 0, background: '#fff', opacity: 0.6 }} />}
@@ -324,9 +362,61 @@ export default function Tour({ steps = TOUR_STEPS, onSubmit, onDone, onExit }) {
         </button>
       </div>
 
-      <button className="btn" onClick={next}>
-        {isLast ? 'Done, check what you found' : `Next: ${steps[idx + 1].area.toLowerCase()}`}
+      <button className="btn" onClick={check}>
+        Check my {step.area === 'Equipment' ? 'kit' : step.area.toLowerCase()}
       </button>
+      </>
+      )}
     </div>
+  );
+}
+
+function Review({ area, job, items, onRemove, onRetry, onMore, onNext, nextLabel, busyLabel }) {
+  const label = area === 'Equipment' ? 'kit' : area.toLowerCase();
+  const loading = job && job.state === 'loading';
+  const failed = job && job.state === 'error';
+  return (
+    <>
+      <div className="scroll">
+        <div className="card" style={{ flexShrink: 0 }}>
+          <p className="h3">{loading ? `Reading your ${label}…` : failed ? 'Hmm, not quite' : `Here’s your ${label}`}</p>
+          {loading && (
+            <div className="row">
+              <div className="spinner" />
+              <p className="sub">This usually takes a few seconds.</p>
+            </div>
+          )}
+          {failed && (
+            <>
+              <p className="error">{job.message}</p>
+              <button className="btn sm ghost" onClick={() => onRetry(job)}>Try again</button>
+            </>
+          )}
+          {!loading && !failed && (
+            <p className="sub">{items.length} {items.length === 1 ? 'thing' : 'things'} found. Tap the cross on anything I got wrong.</p>
+          )}
+          {loading && items.length > 0 && (
+            <p className="sub">Found so far:</p>
+          )}
+          {items.length > 0 && (
+            <div className="grid4">
+              {items.map((it) => (
+                <div className="tile removable" key={it.id}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <p className="name">{it.name}</p>
+                    <p className="qty">{it.qty || it.note || it.status || ''}</p>
+                  </div>
+                  <button className="x" onClick={() => onRemove(it.id)} aria-label={`Remove ${it.name}`}>
+                    <Close size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <button className="btn ghost" onClick={onMore}>Add more to this {area === 'Equipment' ? 'list' : 'area'}</button>
+      <button className="btn" onClick={onNext}>{loading ? busyLabel : nextLabel}</button>
+    </>
   );
 }
