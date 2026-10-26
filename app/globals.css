@@ -280,3 +280,7 @@ label.lbl { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .chip[aria-pressed='true'] { background: var(--forest); border-color: var(--forest); color: #fff; }
 .line-body { flex: 1; min-width: 0; display: flex; border: none; background: transparent; padding: 0; text-align: left; color: inherit; }
 .grid4 .mode-btn { font-size: 13px; }
+
+.wine-style { display: flex; flex-direction: column; gap: 6px; }
+.wine-style + .wine-style { margin-top: 8px; }
+.sub-label { font-size: 12.5px; font-weight: 700; color: var(--muted); padding-left: 2px; }

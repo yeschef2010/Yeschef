@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
+import { WINE_STYLES, wineStyleOf, AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
@@ -316,6 +316,7 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
   const [area, setArea] = useState(item.area || 'Fridge');
   const [status, setStatus] = useState(item.status || '');
   const [category, setCategory] = useState(() => categoryOf({ ...item, area: isKit ? 'Equipment' : item.area }));
+  const [style, setStyle] = useState(() => wineStyleOf(item));
   const [days, setDays] = useState(() => {
     const d = daysLeft(item);
     return d == null ? '' : String(Math.max(0, d));
@@ -332,6 +333,7 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
       area,
       status: status || null,
       category: (AREA_CATEGORIES[area] || []).includes(category) ? category : null,
+      style: category === 'Wine' && WINE_STYLES.includes(style) ? style : null,
       shelfDays: d,
       addedAt: Date.now(),
     });
@@ -357,6 +359,17 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
             <option key={c}>{c}</option>
           ))}
         </select>
+        {area === 'Drinks' && category === 'Wine' && (
+          <>
+            <label className="lbl" htmlFor="ed-style">Type of wine</label>
+            <select id="ed-style" className="input" value={style} onChange={(e) => setStyle(e.target.value)}>
+              {WINE_STYLES.map((w) => (
+                <option key={w}>{w}</option>
+              ))}
+              <option value="Other">Other</option>
+            </select>
+          </>
+        )}
         {!isKit && (
           <>
             <div className="row">

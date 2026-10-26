@@ -51,6 +51,7 @@ function normaliseFood(it, fallbackArea, where) {
     shelfDays: typeof it.shelfDays === 'number' ? it.shelfDays : null,
     status,
     category: typeof it.category === 'string' ? it.category : null,
+    style: ['Red', 'White', 'Rosé', 'Sparkling'].includes(it.style) ? it.style : null,
     // Where it physically is: what the person told us, what the AI saw, or the area being scanned.
     seenIn: fallbackArea === 'Receipt' ? null : PHYSICAL[where] || PHYSICAL[it.seenIn] || fallbackArea || null,
     check: cleanCheck(it.check, ALL),
