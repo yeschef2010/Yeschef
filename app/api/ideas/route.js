@@ -1,4 +1,4 @@
-import { getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse } from '@/lib/ai';
+import { getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
 
 export const maxDuration = 60;
 
@@ -55,13 +55,15 @@ ${kit.map((k) => `- ${k.name}${k.note ? ` (${k.note})` : ''}`).join('\n') || '(n
 }
 
 async function ask(client, prompt, maxTokens) {
-  const msg = await client.messages.create({
-    model: MODEL,
-    max_tokens: maxTokens,
-    system: SYSTEM,
-    messages: [{ role: 'user', content: prompt }],
+  return withRetry(async () => {
+    const msg = await client.messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      system: SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return parseJson(replyText(msg));
   });
-  return parseJson(replyText(msg));
 }
 
 export async function POST(req) {
