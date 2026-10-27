@@ -118,7 +118,8 @@ async function ask(client, prompt, maxTokens, schema) {
       max_tokens: maxTokens,
       system: SYSTEM,
       tools: [{ name: 'answer', description: 'Give your answer by filling this in.', input_schema: SCHEMAS[schema] }],
-      tool_choice: { type: 'tool', name: 'answer' },
+      // This model doesn't allow forcing a tool, so offer it and ask for it in the prompt.
+      tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: prompt }],
     });
     const used = (msg.content || []).find((b) => b.type === 'tool_use');
@@ -154,7 +155,7 @@ Rules:
 - "usedUp" lists stock item names (exactly as written above) that this meal will finish completely. Never include salt, pepper or cooking oil.
 - Steps: 3 to 6 short, clear steps in British English, with temperatures in °C.
 
-Fill in the answer form, like this example:
+Give your answer by calling the "answer" tool (don't write it as text), like this example:
 {"ingredients": [{"name": "Chorizo", "amount": "Half a ring (110g)", "inStock": true, "stockName": "Chorizo", "use": {"n": 110, "unit": "g"}}], "missing": [], "steps": ["Slice the chorizo and fry for 3 minutes."], "usedUp": ["Chorizo"], "tip": ""}`,
         4000,
         'recipe'
@@ -183,7 +184,7 @@ Rules:
 - "lights": UK front-of-pack traffic lights for one portion, each "low", "medium" or "high" (per portion: high is fat over 21g, saturates over 6g, sugar over 15g, salt over 1.8g; low is fat 3g or less, saturates 1.5g or less, sugar 5g or less, salt 0.3g or less).
 - ${tomorrow ? `They're planning ahead late in the evening. "prep" is one short sentence on anything to do tonight to be ready (e.g. "Take the chicken thighs out of the freezer before bed."), or "" if nothing is needed.` : '"prep" is "".'}
 
-Fill in the answer form with exactly three ideas, like this example:
+Give exactly three ideas by calling the "answer" tool (don't write them as text), like this example:
 {"ideas": [{"type": "useup", "title": "Chorizo and chickpea one-pan", "time": "15 mins", "tag": "One pan, hob only", "why": "Uses up your chorizo before it goes off.", "missing": [], "lights": {"fat": "medium", "saturates": "medium", "sugar": "low", "salt": "high"}, "prep": ""}]}`,
       2500,
       'cards'
