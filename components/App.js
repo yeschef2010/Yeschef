@@ -18,7 +18,11 @@ async function postJson(url, body) {
   } catch (e) {
     // ignore
   }
-  if (!res.ok) throw new Error((data && data.message) || FRIENDLY_FAIL);
+  if (!res.ok) {
+    const err = new Error((data && data.message) || FRIENDLY_FAIL);
+    err.detail = (data && data.detail) || (data ? '' : `HTTP ${res.status}`);
+    throw err;
+  }
   return data;
 }
 
@@ -348,7 +352,7 @@ export default function App() {
       setIdeaState('idle');
       cards.forEach((c, i) => loadRecipe(key, i, c, base));
     } catch (e) {
-      setIdeaError(e.message || FRIENDLY_FAIL);
+      setIdeaError(`${e.message || FRIENDLY_FAIL}${e.detail ? `\nDetails: ${e.detail}` : ''}`);
       setIdeaState('error');
     }
   }, [ideaBase, ideaKey, ideaSet, loadRecipe]);

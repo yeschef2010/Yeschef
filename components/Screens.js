@@ -121,7 +121,7 @@ export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaErro
           )}
           {ideaState === 'error' && (
             <div className="card" style={{ borderRadius: 20, padding: 18, gap: 12 }}>
-              <p className="error">{ideaError}</p>
+              <p className="error" style={{ whiteSpace: 'pre-line' }}>{ideaError}</p>
               <button className="btn sm" onClick={onGetIdea}>
                 Try again
               </button>
