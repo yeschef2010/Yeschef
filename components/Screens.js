@@ -5,7 +5,7 @@ import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
 import { AISLES, SHOPS, aisleOf, isRunningLow } from '@/lib/shops';
-import { parseHousehold, portions, scaleUse, scaledAmountText } from '@/lib/servings';
+import { parseHousehold, portions, scaleStepText, scaleUse, scaledAmountText } from '@/lib/servings';
 import { parseQty, formatAmount, totalOf, subtractAmounts, findSame } from '@/lib/amounts';
 
 /* ---------- Welcome ---------- */
@@ -314,7 +314,11 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
   const scaled =
     f === 1 || !idea.ingredients
       ? idea
-      : { ...idea, ingredients: idea.ingredients.map((ing) => ({ ...ing, amount: scaledAmountText(ing, f), use: ing.use ? scaleUse(ing.use, f) : ing.use })) };
+      : {
+          ...idea,
+          ingredients: idea.ingredients.map((ing) => ({ ...ing, amount: scaledAmountText(ing, f), use: ing.use ? scaleUse(ing.use, f) : ing.use })),
+          steps: (idea.steps || []).map((st) => scaleStepText(st, f)),
+        };
   const waiting = idea.detail === 'loading' || idea.detail === 'error' || !Array.isArray(idea.steps) || !idea.steps.length;
   return (
     <div className="screen">
@@ -396,7 +400,7 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
       )}
       <div className="steps">
         <p className="eyebrow">Method</p>
-        {idea.steps.map((s, i) => (
+        {scaled.steps.map((s, i) => (
           <div className="step" key={i}>
             <span className="n">{i + 1}</span>
             <p>{s}</p>
