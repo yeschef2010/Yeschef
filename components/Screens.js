@@ -306,9 +306,11 @@ function Stepper({ label, value, onChange, min = 0 }) {
 
 export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetry, eaters, onEaters }) {
   const [cooking, setCooking] = useState(false);
+  // If the recipe doesn't say who it's for (older ones), it was written for whoever was set when it opened.
+  const [openedFor] = useState(() => eaters || { adults: 2, kids: 0 });
   if (!idea) return null;
   // The recipe is written for idea.serves; scale everything to who's eating tonight.
-  const base = idea.serves && (idea.serves.adults || idea.serves.kids) ? idea.serves : eaters;
+  const base = idea.serves && (idea.serves.adults || idea.serves.kids) ? idea.serves : openedFor;
   const who = eaters || base || { adults: 2, kids: 0 };
   const f = base ? Math.round((portions(who) / portions(base)) * 100) / 100 : 1;
   const scaled =

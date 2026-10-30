@@ -355,6 +355,7 @@ export default function App() {
       mode,
       stock: stockForAi,
       kit: kit.map((k) => ({ name: k.name, note: k.note })),
+      eaters,
       household: eaters
         ? `${eaters.adults} adult${eaters.adults === 1 ? '' : 's'}${eaters.kids ? `, ${eaters.kids} kid${eaters.kids === 1 ? '' : 's'}` : ''}${profile.household && !parseHousehold(profile.household) ? ` (${profile.household})` : ''}`
         : profile.household,
@@ -374,7 +375,7 @@ export default function App() {
       });
     patch({ detail: 'loading' });
     postJson('/api/ideas', { ...base, step: 'recipe', idea: { title: card.title, why: card.why, time: card.time } })
-      .then((r) => patch({ ...r, missing: r.missing && r.missing.length ? r.missing : card.missing, detail: 'ready' }))
+      .then((r) => patch({ ...r, serves: r.serves || base.eaters || null, missing: r.missing && r.missing.length ? r.missing : card.missing, detail: 'ready' }))
       .catch(() => patch({ detail: 'error' }));
   }, [setIdeas]);
 
