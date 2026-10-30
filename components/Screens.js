@@ -568,6 +568,8 @@ export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false, 
 export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickShop }) {
   const [text, setText] = useState('');
   const [copied, setCopied] = useState('');
+  const [unfolded, setUnfolded] = useState({});
+  const [shopping, setShopping] = useState(false);
   const open = list.filter((l) => !l.done);
   const done = list.filter((l) => l.done);
   const onList = (name) => open.some((l) => l.name.toLowerCase() === name.toLowerCase());
@@ -638,45 +640,65 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
       {byAisle.map(([aisle, items]) => (
         <div key={aisle} className="aisle">
           <p className="cat-label">{aisle}</p>
-          {items.map((l) => (
-            <div key={l.id} className="shop-item">
-              <div className="shop-row">
-                <button className="check" aria-pressed={false} onClick={() => toggle(l.id)} aria-label={`Tick off ${l.name}`}>
-                  <span className="box" />
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
-                    <span className="label" style={{ fontSize: 16, fontWeight: 700 }}>{l.chosen || l.name}{l.qty ? <span className="small"> · {l.qty}</span> : null}</span>
-                    {(l.why || l.chosen) && <span className="small">{[l.chosen ? l.name : '', l.why].filter(Boolean).join(' · ')}</span>}
-                  </span>
-                </button>
-                {link(l.chosen || l.name) && (
-                  <a className="shop-go" href={link(l.chosen || l.name)} target="_blank" rel="noreferrer" aria-label={`Find ${l.chosen || l.name} at ${shop.name}`}>
-                    <Chevron open={false} />
-                  </a>
+          {items.map((l) => {
+            const name = l.chosen || l.name;
+            const hasOpts = l.options && l.options.length > 1;
+            const isOpen = !!unfolded[l.id];
+            return (
+              <div key={l.id} className="shop-item">
+                <div className="shop-row">
+                  <button className="tickbox" onClick={() => toggle(l.id)} aria-label={`Tick off ${name}`}>
+                    <span className="box" />
+                  </button>
+                  <div className="shop-text">
+                    <span className="shop-name">
+                      {name}
+                      {l.qty ? <span className="small"> · {l.qty}</span> : null}
+                    </span>
+                    {(l.why || l.chosen) && <span className="shop-why">{[l.chosen ? l.name : '', l.why].filter(Boolean).join(' · ')}</span>}
+                  </div>
+                  {hasOpts && (
+                    <button className="opts-toggle" aria-expanded={isOpen} onClick={() => setUnfolded((u) => ({ ...u, [l.id]: !isOpen }))}>
+                      {l.options.length} types <Chevron open={isOpen} />
+                    </button>
+                  )}
+                  {l.optionsState === 'loading' && <span className="small">…</span>}
+                  {link(name) && (
+                    <a className="shop-go" href={link(name)} target="_blank" rel="noreferrer" aria-label={`Find ${name} at ${shop.name}`}>
+                      <Chevron open={false} />
+                    </a>
+                  )}
+                </div>
+                {hasOpts && isOpen && (
+                  <div className="opts">
+                    {l.options.map((o) => (
+                      <div key={o.name} className={`opt${l.chosen === o.name ? ' on' : ''}`}>
+                        <button
+                          className="opt-pick"
+                          onClick={() => {
+                            choose(l.id, o.name);
+                            setUnfolded((u) => ({ ...u, [l.id]: false }));
+                          }}
+                          aria-pressed={l.chosen === o.name}
+                        >
+                          <span className="opt-name">{o.name}</span>
+                          {o.note && <span className="opt-note">{o.note}</span>}
+                        </button>
+                        {link(o.name) && (
+                          <a className="opt-go" href={link(o.name)} target="_blank" rel="noreferrer" aria-label={`Find ${o.name} at ${shop.name}`}>
+                            <Chevron open={false} />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {l.optionsState === 'error' && (
+                  <button className="link-btn small" style={{ paddingLeft: 36 }} onClick={() => onFindOptions(l)}>Couldn’t find types. Try again</button>
                 )}
               </div>
-              {l.optionsState === 'loading' && <p className="small" style={{ paddingLeft: 40 }}>Finding a few options…</p>}
-              {l.options && l.options.length > 1 && (
-                <div className="opts">
-                  {l.options.map((o) => (
-                    <div key={o.name} className={`opt${l.chosen === o.name ? ' on' : ''}`}>
-                      <button className="opt-pick" onClick={() => choose(l.id, o.name)} aria-pressed={l.chosen === o.name}>
-                        <span className="opt-name">{o.name}</span>
-                        {o.note && <span className="opt-note">{o.note}</span>}
-                      </button>
-                      {link(o.name) && (
-                        <a className="opt-go" href={link(o.name)} target="_blank" rel="noreferrer" aria-label={`Find ${o.name} at ${shop.name}`}>
-                          {shop.name} ›
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {l.optionsState === 'error' && (
-                <button className="link-btn small" style={{ paddingLeft: 40 }} onClick={() => onFindOptions(l)}>Couldn’t find options. Try again</button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ))}
 
@@ -692,6 +714,21 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
         </details>
       )}
 
+      {open.length > 0 && shop && shop.search && (
+        <button className="btn" onClick={() => setShopping(true)}>
+          Shop it at {shop.name}
+        </button>
+      )}
+      {shopping && (
+        <ShopIt
+          items={byAisle.flatMap(([, items]) => items)}
+          shop={shop}
+          onChoose={choose}
+          onDone={(id) => setList((ls) => ls.map((x) => (x.id === id ? { ...x, done: true } : x)))}
+          onClose={() => setShopping(false)}
+        />
+      )}
+
       {list.length > 0 && (
         <div className="row">
           <button className="btn ghost sm" style={{ flex: 1 }} onClick={() => setList(open)} disabled={!done.length}>Clear ticked</button>
@@ -700,6 +737,74 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
       )}
       {copied && <p className="sub">{copied}</p>}
       <p className="small">Snap your receipt after the shop and I’ll tick off what you bought.</p>
+    </div>
+  );
+}
+
+// One item at a time: open it at the supermarket, add it to the basket there, come back, next.
+function ShopIt({ items, shop, onChoose, onDone, onClose }) {
+  const [queue] = useState(() => items.map((i) => i.id));
+  const [pos, setPos] = useState(0);
+  const [opened, setOpened] = useState(false);
+  const item = items.find((i) => i.id === queue[pos]);
+  const finished = pos >= queue.length;
+  const next = () => {
+    setOpened(false);
+    setPos((p) => p + 1);
+  };
+  const name = item ? item.chosen || item.name : '';
+  return (
+    <div className="overlay">
+      <button className="backdrop" aria-label="Close" onClick={onClose} />
+      <div className="sheet" role="dialog" aria-label={`Shop it at ${shop.name}`}>
+        <div className="row between">
+          <p className="eyebrow">{finished ? 'All done' : `${pos + 1} of ${queue.length} · ${shop.name}`}</p>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <Close />
+          </button>
+        </div>
+        {finished || !item ? (
+          <>
+            <p className="h3">That’s the lot, Chef.</p>
+            <p className="sub">Check out in the {shop.name} app. Snap the receipt when it arrives and I’ll update your kitchen.</p>
+            <button className="btn" onClick={onClose}>Done</button>
+          </>
+        ) : (
+          <>
+            <div className="progress"><i style={{ width: `${(pos / queue.length) * 100}%` }} /></div>
+            <p className="h3" style={{ fontSize: 26 }}>
+              {name}
+              {item.qty ? <span className="small"> · {item.qty}</span> : null}
+            </p>
+            {item.why && <p className="sub">{item.why}</p>}
+            {item.options && item.options.length > 1 && (
+              <div className="where" role="group" aria-label="Which type?">
+                {item.options.map((o) => (
+                  <button key={o.name} className="chip" aria-pressed={item.chosen === o.name} onClick={() => onChoose(item.id, o.name)}>
+                    {o.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <a className="btn" href={shop.search(name)} target="_blank" rel="noreferrer" onClick={() => setOpened(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+              Find it at {shop.name}
+            </a>
+            <div className="row">
+              <button className="btn ghost sm" style={{ flex: 1 }} onClick={next}>Skip</button>
+              <button
+                className="btn sm"
+                style={{ flex: 2, background: opened ? 'var(--leaf)' : undefined }}
+                onClick={() => {
+                  onDone(item.id);
+                  next();
+                }}
+              >
+                Added, next
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

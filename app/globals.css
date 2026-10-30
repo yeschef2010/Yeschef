@@ -317,3 +317,24 @@ label.lbl { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .opt-note { font-size: 12.5px; color: var(--muted); }
 .opt-go { font-size: 12.5px; font-weight: 800; color: #fff; background: var(--forest); border-radius: 10px; padding: 7px 10px; white-space: nowrap; text-decoration: none; }
 .done-list summary { cursor: pointer; padding: 6px 0; }
+
+/* compact shopping list */
+.shop-item { gap: 4px; padding: 6px 0; }
+.shop-row { gap: 6px; min-height: 44px; }
+.tickbox { width: 32px; height: 40px; display: flex; align-items: center; background: none; border: none; padding: 0; flex-shrink: 0; }
+.tickbox .box { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line-2); background: var(--card); display: block; }
+.shop-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.shop-name { font-size: 16px; font-weight: 700; color: var(--forest); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-why { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opts-toggle { display: inline-flex; align-items: center; gap: 2px; height: 30px; padding: 0 8px; border-radius: 15px; border: 1.5px solid var(--line-2); background: var(--card); color: var(--forest); font-size: 12.5px; font-weight: 800; flex-shrink: 0; white-space: nowrap; }
+.shop-go { width: 34px; height: 34px; border-radius: 17px; }
+.opts { padding-left: 38px; gap: 4px; }
+.opt { padding: 4px 4px 4px 10px; border-radius: 10px; }
+.opt-name { font-size: 14px; }
+.opt-go { width: 30px; height: 30px; padding: 0; border-radius: 15px; display: flex; align-items: center; justify-content: center; background: var(--sage); color: var(--forest); transform: rotate(-90deg); flex-shrink: 0; }
+.aisle .cat-label { margin-top: 6px; }
+.progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--leaf); }
+
+a.btn, a.btn:visited { color: #fff; }
+.aisle .cat-label { margin: 4px 0 0; }
