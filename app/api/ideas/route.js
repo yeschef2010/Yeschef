@@ -154,6 +154,11 @@ Rules:
 - Only use equipment they have. If the oven has a quirk, put a short warning in "tip", otherwise "tip" is "".
 - "ingredients" lists every ingredient with an amount for the household; "inStock" is true if it's in their stock.
 - "serves" says who those amounts are for, e.g. {"adults": 2, "kids": 2}. Use their household if it's given.
+- Use realistic UK portion sizes, per adult (a child is roughly 60% of that):
+  meat or fish (raw, boneless) 150–180g; mince 125g; pasta or rice (dry) 75–100g; potatoes 200–250g; veg on the side 80–100g;
+  cheese 30–40g; dips like houmous, whipped feta or tzatziki 30–40g; pesto 1–1.5 tbsp; butter for cooking 10g; flatbreads or wraps 1–2.
+- Check every count matches its weight, using typical UK pack sizes: a boneless chicken thigh fillet is about 110g (bone-in about 140g), a chicken breast about 160g, a salmon fillet about 120g, a sea bass fillet about 90g, a medium onion about 150g, a large egg about 60g, a garlic clove about 5g. So "350g (about 3 thighs)", never "about 4".
+- Before answering, add up the main protein and carbs and make sure it's a normal amount for this household, not a party-sized one.
 - For each ingredient from their stock, "stockName" is the stock item's name exactly as written above, and "use" is how much the recipe uses as {"n": number, "unit": "g" | "ml" | "each", "word": "tins"}, in the same unit as their stock amount where you can. Don't use more than they have. For ingredients not in stock, "stockName" and "use" are null.
 - "usedUp" lists stock item names (exactly as written above) that this meal will finish completely. Never include salt, pepper or cooking oil.
 - Steps: 3 to 6 short, clear steps in British English, with temperatures in °C.
