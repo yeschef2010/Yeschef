@@ -1,10 +1,11 @@
 'use client';
 import { WINE_STYLES, groupByCategory, stockTag, wineStyleOf } from '@/lib/helpers';
 import { Chevron, Close } from './Icons';
+import SwipeRow from './SwipeRow';
 
 // Two columns of line items, grouped by category (Dairy & eggs, Veg, Salad…).
 // With `collapsible`, each category folds away under a tappable header showing its count and any warnings.
-export default function ItemGroups({ items, area, onTap, onRemove, onSelect, showTags = false, showCategories = true, collapsible = false, openCats = {}, onToggleCat }) {
+export default function ItemGroups({ items, area, onTap, onDelete, onRemove, onSelect, showTags = false, showCategories = true, collapsible = false, openCats = {}, onToggleCat }) {
   const groups = showCategories ? groupByCategory(items, area) : [{ category: '', items }];
   const renderItem = (it) => {
               const tag = showTags ? stockTag(it) : null;
@@ -22,6 +23,13 @@ export default function ItemGroups({ items, area, onTap, onRemove, onSelect, sho
                 </span>
               );
               const tone = tag ? ` tone-${tag.cls}` : '';
+              if (onTap && onDelete) {
+                return (
+                  <SwipeRow key={it.id} className={tone.trim()} title={it.name} label={it.name} onTap={() => onTap(it)} onDelete={() => onDelete(it)}>
+                    {body}
+                  </SwipeRow>
+                );
+              }
               if (onTap) {
                 return (
                   <button key={it.id} className={`line${tone}`} onClick={() => onTap(it)} title={it.name}>

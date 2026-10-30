@@ -347,3 +347,10 @@ a.btn, a.btn:visited { color: #fff; }
 .opt-tick .box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-2); background: #fff; display: flex; align-items: center; justify-content: center; color: #fff; }
 .opt.on .opt-tick .box { background: var(--forest); border-color: var(--forest); }
 .opt.dim { opacity: 0.45; }
+
+/* swipe to delete */
+.swipe { position: relative; border-radius: 12px; overflow: hidden; }
+.swipe > .line { position: relative; z-index: 1; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.swipe-del { position: absolute; right: 0; top: 0; bottom: 0; width: 84px; border: none; background: var(--tomato); color: #fff; font-weight: 800; font-size: 14px; }
+.undo-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--forest); color: #fff; border-radius: 14px; padding: 10px 14px; font-size: 15px; font-weight: 700; }
+.undo-bar button { background: none; border: none; color: var(--honey); font-weight: 800; font-size: 15px; text-decoration: underline; }

@@ -115,6 +115,22 @@ export default function App() {
   const shopRef = useRef(shopList);
   shopRef.current = shopList;
   const [bannerAction, setBannerAction] = useState(null);
+  // The last thing swiped away, so it can come back.
+  const [undo, setUndo] = useState(null);
+  const undoTimer = useRef(null);
+  function swipeDelete(item, isProduct) {
+    const set = isProduct ? setProducts : setStock;
+    set((list) => list.filter((x) => x.id !== item.id));
+    setUndo({ ...item, isProduct });
+    clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setUndo(null), 6000);
+  }
+  function undoDelete() {
+    if (!undo) return;
+    const { isProduct, ...item } = undo;
+    (isProduct ? setProducts : setStock)((list) => (list.some((x) => x.id === item.id) ? list : [...list, item]));
+    setUndo(null);
+  }
   const [ideas, setIdeas] = usePersistentState('yc.ideas', {});
   const [household, setHousehold] = usePersistentState('yc.household', null);
   const [mounted, setMounted] = useState(false);
@@ -559,6 +575,9 @@ export default function App() {
           stock={stock}
           banner={banner}
           onEdit={(it) => setEditing({ item: it, isKit: false })}
+          onDelete={(it) => swipeDelete(it, false)}
+          undo={undo && !undo.isProduct ? undo : null}
+          onUndo={undoDelete}
           onAdd={() => startAdd('kitchen')}
         />
       )}
@@ -568,6 +587,9 @@ export default function App() {
           products
           stock={products}
           onEdit={(it) => setEditing({ item: it, isKit: false, isProduct: true })}
+          onDelete={(it) => swipeDelete(it, true)}
+          undo={undo && undo.isProduct ? undo : null}
+          onUndo={undoDelete}
           onAdd={() => startAdd('products')}
         />
       )}

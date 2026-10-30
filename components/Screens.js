@@ -488,7 +488,7 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
 }
 
 /* ---------- Kitchen ---------- */
-export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false, banner }) {
+export function Kitchen({ stock, onEdit, onDelete, undo, onUndo, onAdd, onUpdateArea, products = false, banner }) {
   const areas = products ? PRODUCT_AREAS : FOOD_AREAS;
   const [open, setOpen] = useState({ [areas[0]]: true });
   const [openCats, setOpenCats] = useState({});
@@ -505,6 +505,13 @@ export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false, 
           <p style={{ fontSize: 15, lineHeight: 1.45 }}>{banner}</p>
         </div>
       )}
+      {undo && (
+        <div className="undo-bar" role="status">
+          <span>Removed {undo.name.toLowerCase()}</span>
+          <button onClick={onUndo}>Undo</button>
+        </div>
+      )}
+      {!undo && stock.length > 0 && <p className="small" style={{ marginTop: -8 }}>Tap to edit · swipe left to delete</p>}
       {products ? (
         <div className="legend" aria-label="Colour key">
           <span><i className="amber" />Running low</span>
@@ -542,6 +549,7 @@ export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false, 
                     items={items}
                     area={area}
                     onTap={onEdit}
+                    onDelete={onDelete}
                     showTags
                     showCategories={!FLAT_AREAS.includes(area)}
                     collapsible
