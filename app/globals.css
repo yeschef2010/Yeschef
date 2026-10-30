@@ -354,3 +354,10 @@ a.btn, a.btn:visited { color: #fff; }
 .swipe-del { position: absolute; right: 0; top: 0; bottom: 0; width: 84px; border: none; background: var(--tomato); color: #fff; font-weight: 800; font-size: 14px; }
 .undo-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--forest); color: #fff; border-radius: 14px; padding: 10px 14px; font-size: 15px; font-weight: 700; }
 .undo-bar button { background: none; border: none; color: var(--honey); font-weight: 800; font-size: 15px; text-decoration: underline; }
+
+.eaters { display: flex; gap: 8px; }
+.stepper { flex: 1; display: flex; align-items: center; gap: 6px; background: var(--card); border: 1.5px solid var(--line-2); border-radius: 14px; padding: 6px 6px 6px 12px; }
+.stepper-label { flex: 1; font-size: 14px; font-weight: 800; color: var(--forest); }
+.stepper button { width: 34px; height: 34px; border-radius: 17px; border: none; background: var(--sage); color: var(--forest); font-size: 20px; font-weight: 800; line-height: 1; }
+.stepper button:disabled { opacity: 0.35; }
+.stepper-n { min-width: 18px; text-align: center; font-size: 17px; font-weight: 800; color: var(--forest); }

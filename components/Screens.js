@@ -5,6 +5,7 @@ import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
 import { AISLES, SHOPS, aisleOf, isRunningLow } from '@/lib/shops';
+import { parseHousehold, portions, scaleUse, scaledAmountText } from '@/lib/servings';
 import { parseQty, formatAmount, totalOf, subtractAmounts, findSame } from '@/lib/amounts';
 
 /* ---------- Welcome ---------- */
@@ -292,9 +293,28 @@ function CookedSheet({ idea, stock, onConfirm, onClose }) {
   );
 }
 
-export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetry }) {
+function Stepper({ label, value, onChange, min = 0 }) {
+  return (
+    <div className="stepper">
+      <span className="stepper-label">{label}</span>
+      <button onClick={() => onChange(Math.max(min, value - 1))} aria-label={`Fewer ${label.toLowerCase()}`} disabled={value <= min}>−</button>
+      <span className="stepper-n" aria-live="polite">{value}</span>
+      <button onClick={() => onChange(Math.min(12, value + 1))} aria-label={`More ${label.toLowerCase()}`}>+</button>
+    </div>
+  );
+}
+
+export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetry, eaters, onEaters }) {
   const [cooking, setCooking] = useState(false);
   if (!idea) return null;
+  // The recipe is written for idea.serves; scale everything to who's eating tonight.
+  const base = idea.serves && (idea.serves.adults || idea.serves.kids) ? idea.serves : eaters;
+  const who = eaters || base || { adults: 2, kids: 0 };
+  const f = base ? Math.round((portions(who) / portions(base)) * 100) / 100 : 1;
+  const scaled =
+    f === 1 || !idea.ingredients
+      ? idea
+      : { ...idea, ingredients: idea.ingredients.map((ing) => ({ ...ing, amount: scaledAmountText(ing, f), use: ing.use ? scaleUse(ing.use, f) : ing.use })) };
   const waiting = idea.detail === 'loading' || idea.detail === 'error' || !Array.isArray(idea.steps) || !idea.steps.length;
   return (
     <div className="screen">
@@ -307,6 +327,12 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
         </h2>
         <p className="sub">{[idea.time, idea.tag].filter(Boolean).join(' · ')}</p>
       </div>
+      {onEaters && (
+        <div className="eaters" role="group" aria-label="Who's eating?">
+          <Stepper label="Adults" value={who.adults} min={who.kids ? 0 : 1} onChange={(n) => onEaters({ ...who, adults: n })} />
+          <Stepper label="Kids" value={who.kids} min={who.adults ? 0 : 1} onChange={(n) => onEaters({ ...who, kids: n })} />
+        </div>
+      )}
       {idea.prep && (
         <div className="card honey tight">
           <p style={{ fontSize: 15, lineHeight: 1.45 }}>
@@ -351,7 +377,7 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
         <p className="eyebrow" style={{ marginBottom: 4 }}>
           Ingredients
         </p>
-        {idea.ingredients.map((ing, i) => (
+        {scaled.ingredients.map((ing, i) => (
           <div className="list-row" key={i}>
             <p style={{ fontSize: 16 }}>
               {ing.name}
@@ -382,7 +408,7 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
       </button>
         </>
       )}
-      {cooking && <CookedSheet idea={idea} stock={stock} onClose={() => setCooking(false)} onConfirm={(changes) => { setCooking(false); onCooked(changes); }} />}
+      {cooking && <CookedSheet idea={scaled} stock={stock} onClose={() => setCooking(false)} onConfirm={(changes) => { setCooking(false); onCooked(changes); }} />}
     </div>
   );
 }

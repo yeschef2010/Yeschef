@@ -27,6 +27,7 @@ const cleanRecipe = (r) => ({
   steps: Array.isArray(r.steps) ? r.steps : [],
   usedUp: Array.isArray(r.usedUp) ? r.usedUp : [],
   tip: r.tip || '',
+  serves: r.serves && (Number(r.serves.adults) || Number(r.serves.kids)) ? { adults: Number(r.serves.adults) || 0, kids: Number(r.serves.kids) || 0 } : null,
 });
 
 const SYSTEM =
@@ -106,6 +107,7 @@ const SCHEMAS = {
       steps: { type: 'array', items: { type: 'string' } },
       usedUp: { type: 'array', items: { type: 'string' } },
       tip: { type: 'string' },
+      serves: { type: 'object', properties: { adults: { type: 'number' }, kids: { type: 'number' } } },
     },
     required: ['ingredients', 'steps'],
   },
@@ -151,6 +153,7 @@ Rules:
 - Mostly use what they have. Salt, pepper and cooking oil are always available. "missing" lists anything they need to buy (at most 2).
 - Only use equipment they have. If the oven has a quirk, put a short warning in "tip", otherwise "tip" is "".
 - "ingredients" lists every ingredient with an amount for the household; "inStock" is true if it's in their stock.
+- "serves" says who those amounts are for, e.g. {"adults": 2, "kids": 2}. Use their household if it's given.
 - For each ingredient from their stock, "stockName" is the stock item's name exactly as written above, and "use" is how much the recipe uses as {"n": number, "unit": "g" | "ml" | "each", "word": "tins"}, in the same unit as their stock amount where you can. Don't use more than they have. For ingredients not in stock, "stockName" and "use" are null.
 - "usedUp" lists stock item names (exactly as written above) that this meal will finish completely. Never include salt, pepper or cooking oil.
 - Steps: 3 to 6 short, clear steps in British English, with temperatures in °C.

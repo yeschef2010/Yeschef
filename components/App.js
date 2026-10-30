@@ -5,6 +5,7 @@ import { useHouseholdSync } from '@/lib/sync';
 import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, totalOf } from '@/lib/amounts';
 import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
 import AddItems from './Tour';
+import { parseHousehold } from '@/lib/servings';
 import { aisleOf, matchesListItem, shopById } from '@/lib/shops';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
 import { Basket, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
@@ -133,6 +134,11 @@ export default function App() {
   }
   const [ideas, setIdeas] = usePersistentState('yc.ideas', {});
   const [household, setHousehold] = usePersistentState('yc.household', null);
+  // Who's usually eating: set on a recipe, or read from "2 adults, 2 kids" in Account.
+  const eaters =
+    profile.adults != null || profile.kids != null
+      ? { adults: profile.adults ?? 2, kids: profile.kids ?? 0 }
+      : parseHousehold(profile.household);
   const [mounted, setMounted] = useState(false);
   const [joinPrefill, setJoinPrefill] = useState('');
   useEffect(() => setMounted(true), []);
@@ -349,7 +355,9 @@ export default function App() {
       mode,
       stock: stockForAi,
       kit: kit.map((k) => ({ name: k.name, note: k.note })),
-      household: profile.household,
+      household: eaters
+        ? `${eaters.adults} adult${eaters.adults === 1 ? '' : 's'}${eaters.kids ? `, ${eaters.kids} kid${eaters.kids === 1 ? '' : 's'}` : ''}${profile.household && !parseHousehold(profile.household) ? ` (${profile.household})` : ''}`
+        : profile.household,
       dietary: profile.dietary,
       context: `It's ${day}${weekend ? ' (weekend)' : ''}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.`,
     };
@@ -568,7 +576,7 @@ export default function App() {
         />
       )}
 
-      {current === 'recipe' && <Recipe idea={idea} stock={stock} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, ideaBase())} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
+      {current === 'recipe' && <Recipe idea={idea} stock={stock} eaters={eaters} onEaters={(e) => setProfile((p) => ({ ...p, adults: e.adults, kids: e.kids }))} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, ideaBase())} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
 
       {current === 'kitchen' && (
         <Kitchen
