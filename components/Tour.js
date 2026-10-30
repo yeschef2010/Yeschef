@@ -195,7 +195,7 @@ export default function AddItems({ mode: addMode = 'kitchen', onSubmit, onDone, 
     setBusy(true);
     setCamError('');
     const r = await receiptFiles(files);
-    setReceipt((prev) => ({ images: [...prev.images, ...r.images].slice(0, 6), docs: [...prev.docs, ...r.docs].slice(0, 2) }));
+    setReceipt((prev) => ({ images: [...prev.images, ...r.images].slice(0, 6), docs: [...prev.docs, ...r.docs].slice(0, 16) }));
     if (r.problems.length) setCamError(r.problems.join(' '));
     setBusy(false);
   }

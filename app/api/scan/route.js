@@ -1,5 +1,5 @@
 import { AREA_CATEGORIES } from '@/lib/helpers';
-import { getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKeyResponse, failResponse } from '@/lib/ai';
+import { withRetry, getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKeyResponse, failResponse } from '@/lib/ai';
 
 export const maxDuration = 60;
 
@@ -75,6 +75,7 @@ export async function POST(req) {
 - Use the quantity on the line (e.g. "2 x" means 2). "amount" is the total bought: 2 x 2.272L milk is {"n":4544,"unit":"ml"} with "pack" {"n":2272,"unit":"ml"}; 2 x 400g tins of tomatoes is {"n":2,"unit":"each","word":"tins"} with "pack" {"n":400,"unit":"g"}. Loose veg sold by weight (0.62kg) is in "g".
 - Put each item in the area for what it is (frozen food in Freezer, fresh herbs in Fresh herbs, all drinks, including beer, wine and spirits, in Drinks).
 - Estimate "shelfDays" from today for fresh food as if just bought (e.g. fresh chicken 2\u20133, milk 7, bagged salad 4, carrots 14).
+- An order email may show a short "Products added" or "Products removed" list of changes as well as the full item list. List each product once; skip anything removed, unavailable or out of stock.
 - Include cleaning, laundry and dishwasher products in their areas. Skip toiletries, nappies, carrier bags, totals, savings, Clubcard or Nectar lines, and unavailable items.`
       : '';
 
@@ -122,15 +123,25 @@ export async function POST(req) {
       },
     ];
 
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4000,
-      system:
-        'You are the stock-taking assistant inside Yes Chef!, a UK kitchen app for busy families. You turn quick videos, photos and spoken notes into a tidy stock list of food, drink and household products. Be accurate and never invent items you have no evidence for.',
-      messages: [{ role: 'user', content }],
+    // The AI fills in a form (a tool) rather than writing JSON as text, so long lists come back in shape.
+    content[content.length - 1].text += '\n\nGive your answer by calling the "answer" tool with the items list (don\'t write it as text).';
+    const data = await withRetry(async () => {
+      const msg = await client.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        system:
+          'You are the stock-taking assistant inside Yes Chef!, a UK kitchen app for busy families. You turn quick videos, photos and spoken notes into a tidy stock list of food, drink and household products. Be accurate and never invent items you have no evidence for.',
+        tools: [{ name: 'answer', description: 'Give the items you found.', input_schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } } }, required: ['items'] } }],
+        tool_choice: { type: 'auto' },
+        messages: [{ role: 'user', content }],
+      });
+      const used = (msg.content || []).find((b) => b.type === 'tool_use');
+      if (used && used.input && Array.isArray(used.input.items)) {
+        if (msg.stop_reason === 'max_tokens') throw new Error('Reply cut short (JSON incomplete)');
+        return used.input;
+      }
+      return parseJson(replyText(msg));
     });
-
-    const data = parseJson(replyText(msg));
     const items = Array.isArray(data.items) ? data.items : [];
     return Response.json({ items, kind: isKit ? 'kit' : 'food' });
   } catch (e) {
