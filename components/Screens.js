@@ -677,16 +677,15 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
                 </div>
                 {hasOpts && isOpen && (
                   <div className="opts">
-                    {l.options.map((o) => (
-                      <div key={o.name} className={`opt${l.chosen === o.name ? ' on' : ''}`}>
-                        <button
-                          className="opt-pick"
-                          onClick={() => {
-                            choose(l.id, o.name);
-                            setUnfolded((u) => ({ ...u, [l.id]: false }));
-                          }}
-                          aria-pressed={l.chosen === o.name}
-                        >
+                    {l.options.map((o) => {
+                      const on = l.chosen === o.name;
+                      const dim = l.chosen && !on;
+                      return (
+                      <div key={o.name} className={`opt${on ? ' on' : ''}${dim ? ' dim' : ''}`}>
+                        <button className="opt-tick" onClick={() => choose(l.id, o.name)} aria-pressed={on} aria-label={`${on ? 'Untick' : 'Choose'} ${o.name}`}>
+                          <span className="box">{on && <Tick />}</span>
+                        </button>
+                        <button className="opt-pick" onClick={() => choose(l.id, o.name)} aria-pressed={on}>
                           <span className="opt-name">{o.name}</span>
                           {o.note && <span className="opt-note">{o.note}</span>}
                         </button>
@@ -696,7 +695,8 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
                           </a>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 {l.optionsState === 'error' && (

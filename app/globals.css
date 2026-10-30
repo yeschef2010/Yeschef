@@ -341,3 +341,9 @@ a.btn, a.btn:visited { color: #fff; }
 
 .low-card { padding-top: 4px; padding-bottom: 4px; }
 .low-head { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px; background: none; border: none; padding: 0; color: var(--tomato); }
+
+.opt { padding-left: 4px; }
+.opt-tick { width: 34px; height: 36px; display: flex; align-items: center; justify-content: center; background: none; border: none; padding: 0; flex-shrink: 0; }
+.opt-tick .box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-2); background: #fff; display: flex; align-items: center; justify-content: center; color: #fff; }
+.opt.on .opt-tick .box { background: var(--forest); border-color: var(--forest); }
+.opt.dim { opacity: 0.45; }
