@@ -4,10 +4,23 @@ import { WINE_STYLES, wineStyleOf, AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEAL
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
+import { AISLES, SHOPS, aisleOf, isRunningLow } from '@/lib/shops';
 import { parseQty, formatAmount, totalOf, subtractAmounts, findSame } from '@/lib/amounts';
 
 /* ---------- Welcome ---------- */
-export function Welcome({ onTour, onSkip }) {
+export function ShopPicker({ value, onChange }) {
+  return (
+    <div className="where shops" role="group" aria-label="Where do you usually shop?">
+      {SHOPS.map((sh) => (
+        <button key={sh.id} className="chip" aria-pressed={value === sh.id} onClick={() => onChange(sh.id)}>
+          {sh.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Welcome({ onTour, onSkip, supermarket, setSupermarket }) {
   return (
     <div className="screen" style={{ justifyContent: 'space-between', paddingTop: 56 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -19,6 +32,12 @@ export function Welcome({ onTour, onSkip }) {
           <p className="lead">I'm your kitchen assistant. You cook, I'll handle the admin: what's in, what needs using up, and what to buy.</p>
           <p className="lead">First, show me what you’ve got. Film, snap, talk or scan a receipt, anywhere in the house, and I’ll sort it all out.</p>
         </div>
+        {setSupermarket && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p className="lbl">Where do you usually shop?</p>
+            <ShopPicker value={supermarket} onChange={setSupermarket} />
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button className="btn" onClick={onTour}>
@@ -56,7 +75,7 @@ export function DrinksCard({ stock, title = 'Ready to pour' }) {
 }
 
 /* ---------- Main meal screen ---------- */
-export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, showUseUp }) {
+export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
   const meal = MEALS[mealKey];
   const urgent = stock.filter((s) => s.area !== 'Spice rack' && !s.status && stockTag(s).cls === 'red');
   const empty = stock.length === 0;
@@ -76,6 +95,11 @@ export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaErro
       {banner && (
         <div className="card green tight">
           <p style={{ fontSize: 15, lineHeight: 1.45 }}>{banner}</p>
+          {bannerAction && (
+            <button className="btn sm ghost" style={{ alignSelf: 'flex-start', height: 38 }} onClick={onBannerAction}>
+              {bannerAction.label}
+            </button>
+          )}
         </div>
       )}
 
@@ -464,7 +488,7 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
 }
 
 /* ---------- Kitchen ---------- */
-export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false }) {
+export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false, banner }) {
   const areas = products ? PRODUCT_AREAS : FOOD_AREAS;
   const [open, setOpen] = useState({ [areas[0]]: true });
   const [openCats, setOpenCats] = useState({});
@@ -476,6 +500,11 @@ export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false }
         <h2 className="h2" style={{ fontSize: 32 }}>{products ? 'Household products' : 'Your kitchen'}</h2>
         <p className="sub">{stock.length} things logged. Tap one to change it.</p>
       </div>
+      {banner && (
+        <div className="card green tight">
+          <p style={{ fontSize: 15, lineHeight: 1.45 }}>{banner}</p>
+        </div>
+      )}
       {products ? (
         <div className="legend" aria-label="Colour key">
           <span><i className="amber" />Running low</span>
@@ -536,20 +565,31 @@ export function Kitchen({ stock, onEdit, onAdd, onUpdateArea, products = false }
 }
 
 /* ---------- Shopping list ---------- */
-export function Shop({ list, setList, stock }) {
+export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickShop }) {
   const [text, setText] = useState('');
   const [copied, setCopied] = useState('');
-  const onList = new Set(list.map((l) => l.name.toLowerCase()));
-  const suggestions = stock.filter((s) => (s.status === 'Low' || s.status === 'Out') && !onList.has(s.name.toLowerCase()));
+  const open = list.filter((l) => !l.done);
+  const done = list.filter((l) => l.done);
+  const onList = (name) => open.some((l) => l.name.toLowerCase() === name.toLowerCase());
+  const suggestions = stock.filter((s) => isRunningLow(s) && !onList(s.name));
+  const link = (term) => (shop && shop.search ? shop.search(term) : null);
 
-  function add(name, why = '') {
-    const n = name.trim();
-    if (!n || onList.has(n.toLowerCase())) return;
-    setList([...list, { id: Math.random().toString(36).slice(2), name: n, why, done: false }]);
+  function add() {
+    const n = text.trim();
+    if (!n) return;
+    onAdd([n], '', { findOptions: true });
+    setText('');
   }
 
+  const toggle = (id) => setList(list.map((x) => (x.id === id ? { ...x, done: !x.done } : x)));
+  const choose = (id, name) => setList(list.map((x) => (x.id === id ? { ...x, chosen: x.chosen === name ? null : name } : x)));
+
+  const byAisle = AISLES.map((a) => [a, open.filter((l) => (l.aisle || aisleOf(l.name)) === a)]).filter(([, items]) => items.length);
+
   async function share() {
-    const textList = list.filter((l) => !l.done).map((l) => `- ${l.name}`).join('\n');
+    const textList = byAisle
+      .map(([a, items]) => `${a}\n${items.map((l) => `- ${l.chosen || l.name}${l.qty ? ` (${l.qty})` : ''}`).join('\n')}`)
+      .join('\n\n');
     if (!textList) return;
     try {
       if (navigator.share) {
@@ -557,7 +597,7 @@ export function Shop({ list, setList, stock }) {
         return;
       }
       await navigator.clipboard.writeText(textList);
-      setCopied('Copied. Paste it into your supermarket app.');
+      setCopied('Copied. Paste it wherever you like.');
     } catch (e) {
       // user cancelled
     }
@@ -567,14 +607,17 @@ export function Shop({ list, setList, stock }) {
     <div className="screen" style={{ paddingTop: 28 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
         <h2 className="h2" style={{ fontSize: 32 }}>Next shop</h2>
-        <p className="sub">Everything you need, in one list.</p>
+        <p className="sub">
+          {shop ? (shop.search ? `Tap the arrow to find it at ${shop.name}.` : `${shop.name} doesn’t shop online, so this is your list to take with you.`) : 'Everything you need, in one list.'}{' '}
+          <button className="link-btn" onClick={onPickShop}>{shop ? 'Change' : 'Pick your supermarket'}</button>
+        </p>
       </div>
 
       <div className="row">
         <label htmlFor="shop-add" className="sr-only">Add to list</label>
-        <input id="shop-add" className="input" placeholder="Add something" value={text} onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { add(text); setText(''); } }} />
-        <button className="btn sm" onClick={() => { add(text); setText(''); }} disabled={!text.trim()}>Add</button>
+        <input id="shop-add" className="input" placeholder="Add something, e.g. roast chicken" value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+        <button className="btn sm" onClick={add} disabled={!text.trim()}>Add</button>
       </div>
 
       {suggestions.length > 0 && (
@@ -582,7 +625,7 @@ export function Shop({ list, setList, stock }) {
           <p className="eyebrow orange">Running low</p>
           <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
             {suggestions.map((s) => (
-              <button key={s.id} className="btn sm ghost" style={{ height: 36 }} onClick={() => add(s.name, 'Running low')}>
+              <button key={s.id} className="btn sm ghost" style={{ height: 36 }} onClick={() => onAdd([{ name: s.name, area: s.area, category: s.category, qty: '' }], `Running low${s.qty ? ` · ${s.qty} left` : ''}`)}>
                 + {s.name}
               </button>
             ))}
@@ -590,31 +633,73 @@ export function Shop({ list, setList, stock }) {
         </div>
       )}
 
-      {list.length === 0 ? (
-        <p className="sub">Your list is empty. Missing ingredients from recipes land here too.</p>
-      ) : (
-        <div>
-          {list.map((l) => (
-            <button key={l.id} className="check" aria-pressed={l.done}
-              onClick={() => setList(list.map((x) => (x.id === l.id ? { ...x, done: !x.done } : x)))}>
-              <span className="box">{l.done && <Tick />}</span>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span className="label" style={{ fontSize: 16, fontWeight: 700 }}>{l.name}</span>
-                {l.why && <span className="small">{l.why}</span>}
-              </span>
-            </button>
+      {open.length === 0 && <p className="sub">Your list is empty. Things you run out of, and anything a recipe needs, land here too.</p>}
+
+      {byAisle.map(([aisle, items]) => (
+        <div key={aisle} className="aisle">
+          <p className="cat-label">{aisle}</p>
+          {items.map((l) => (
+            <div key={l.id} className="shop-item">
+              <div className="shop-row">
+                <button className="check" aria-pressed={false} onClick={() => toggle(l.id)} aria-label={`Tick off ${l.name}`}>
+                  <span className="box" />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
+                    <span className="label" style={{ fontSize: 16, fontWeight: 700 }}>{l.chosen || l.name}{l.qty ? <span className="small"> · {l.qty}</span> : null}</span>
+                    {(l.why || l.chosen) && <span className="small">{[l.chosen ? l.name : '', l.why].filter(Boolean).join(' · ')}</span>}
+                  </span>
+                </button>
+                {link(l.chosen || l.name) && (
+                  <a className="shop-go" href={link(l.chosen || l.name)} target="_blank" rel="noreferrer" aria-label={`Find ${l.chosen || l.name} at ${shop.name}`}>
+                    <Chevron open={false} />
+                  </a>
+                )}
+              </div>
+              {l.optionsState === 'loading' && <p className="small" style={{ paddingLeft: 40 }}>Finding a few options…</p>}
+              {l.options && l.options.length > 1 && (
+                <div className="opts">
+                  {l.options.map((o) => (
+                    <div key={o.name} className={`opt${l.chosen === o.name ? ' on' : ''}`}>
+                      <button className="opt-pick" onClick={() => choose(l.id, o.name)} aria-pressed={l.chosen === o.name}>
+                        <span className="opt-name">{o.name}</span>
+                        {o.note && <span className="opt-note">{o.note}</span>}
+                      </button>
+                      {link(o.name) && (
+                        <a className="opt-go" href={link(o.name)} target="_blank" rel="noreferrer" aria-label={`Find ${o.name} at ${shop.name}`}>
+                          {shop.name} ›
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {l.optionsState === 'error' && (
+                <button className="link-btn small" style={{ paddingLeft: 40 }} onClick={() => onFindOptions(l)}>Couldn’t find options. Try again</button>
+              )}
+            </div>
           ))}
         </div>
+      ))}
+
+      {done.length > 0 && (
+        <details className="done-list">
+          <summary className="small">Got {done.length} {done.length === 1 ? 'thing' : 'things'}</summary>
+          {done.map((l) => (
+            <button key={l.id} className="check" aria-pressed onClick={() => toggle(l.id)}>
+              <span className="box"><Tick /></span>
+              <span className="label" style={{ fontSize: 15 }}>{l.chosen || l.name}</span>
+            </button>
+          ))}
+        </details>
       )}
 
       {list.length > 0 && (
         <div className="row">
-          <button className="btn ghost sm" style={{ flex: 1 }} onClick={() => setList(list.filter((l) => !l.done))}>Clear ticked</button>
-          <button className="btn sm" style={{ flex: 1 }} onClick={share}>Share list</button>
+          <button className="btn ghost sm" style={{ flex: 1 }} onClick={() => setList(open)} disabled={!done.length}>Clear ticked</button>
+          <button className="btn sm" style={{ flex: 1 }} onClick={share} disabled={!open.length}>Share list</button>
         </div>
       )}
       {copied && <p className="sub">{copied}</p>}
-      <p className="small">Coming later: pick the cheapest supermarket and send the order straight to Tesco or Sainsbury's.</p>
+      <p className="small">Snap your receipt after the shop and I’ll tick off what you bought.</p>
     </div>
   );
 }
@@ -750,9 +835,10 @@ export function Account({ profile, setProfile, onBack, household, sync, joinPref
       {field('household', 'Who are you cooking for?', 'e.g. 2 adults, 2 kids')}
       {field('dietary', 'Dietary needs or dislikes', 'e.g. no mushrooms, one veggie')}
       <p className="sub">I use this to size recipes and steer clear of things you don't eat.</p>
-      <div className="card tight">
-        <p className="eyebrow">Linked supermarkets</p>
-        <p className="sub">Coming later: link Tesco and Sainsbury's so your orders update your kitchen automatically.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <p className="lbl">Where do you usually shop?</p>
+        <ShopPicker value={profile.supermarket} onChange={(id) => setProfile({ ...profile, supermarket: id })} />
+        <p className="sub">Your shopping list links straight to their search, so you see real products and prices.</p>
       </div>
     </div>
   );

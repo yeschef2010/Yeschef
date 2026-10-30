@@ -301,3 +301,19 @@ label.lbl { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .light.medium { background: #F5DDA9; color: #6B4A00; }
 .light.high { background: #F7C2B9; color: #8A1C0E; }
 .card.honey { background: var(--honey); }
+
+.shops .chip { flex: 0 0 auto; }
+.link-btn { background: none; border: none; padding: 0; color: var(--leaf); font-weight: 800; text-decoration: underline; font-size: inherit; }
+.aisle { display: flex; flex-direction: column; gap: 4px; }
+.shop-item { display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.shop-row { display: flex; align-items: center; gap: 8px; }
+.shop-row .check { flex: 1; min-width: 0; border-bottom: none; }
+.shop-go { width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: var(--sage); color: var(--forest); flex-shrink: 0; transform: rotate(-90deg); }
+.opts { display: flex; flex-direction: column; gap: 6px; padding-left: 40px; }
+.opt { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1.5px solid var(--line-2); border-radius: 12px; padding: 6px 6px 6px 10px; }
+.opt.on { border-color: var(--forest); background: #EAF2E5; }
+.opt-pick { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left; background: none; border: none; padding: 0; color: var(--forest); }
+.opt-name { font-size: 14.5px; font-weight: 800; }
+.opt-note { font-size: 12.5px; color: var(--muted); }
+.opt-go { font-size: 12.5px; font-weight: 800; color: #fff; background: var(--forest); border-radius: 10px; padding: 7px 10px; white-space: nowrap; text-decoration: none; }
+.done-list summary { cursor: pointer; padding: 6px 0; }

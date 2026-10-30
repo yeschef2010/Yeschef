@@ -5,6 +5,7 @@ import { useHouseholdSync } from '@/lib/sync';
 import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, totalOf } from '@/lib/amounts';
 import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
 import AddItems from './Tour';
+import { aisleOf, matchesListItem, shopById } from '@/lib/shops';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
 import { Basket, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
 
@@ -111,6 +112,9 @@ export default function App() {
   const [profile, setProfile] = usePersistentState('yc.profile', { name: '', household: '', dietary: '' });
   const [settings, setSettings] = usePersistentState('yc.settings', { useUp: true, autoIdea: true });
   const [shopList, setShopList] = usePersistentState('yc.shop', []);
+  const shopRef = useRef(shopList);
+  shopRef.current = shopList;
+  const [bannerAction, setBannerAction] = useState(null);
   const [ideas, setIdeas] = usePersistentState('yc.ideas', {});
   const [household, setHousehold] = usePersistentState('yc.household', null);
   const [mounted, setMounted] = useState(false);
@@ -215,7 +219,19 @@ export default function App() {
       });
     }
     if (food.length || kitItems.length) setIdeas({});
-  }, [setStock, setKit, setProducts, setIdeas]);
+    // Anything bought on a receipt comes off the shopping list.
+    const bought = [...food, ...productItems].filter((f) => f.source === 'receipt').map((f) => f.name);
+    if (bought.length) {
+      const open = shopRef.current.filter((l) => !l.done);
+      const ticked = open.filter((l) => bought.some((b) => matchesListItem(l, b)));
+      if (ticked.length) {
+        const ids = new Set(ticked.map((t) => t.id));
+        setShopList((l) => l.map((x) => (ids.has(x.id) ? { ...x, done: true } : x)));
+        const still = open.filter((l) => !ids.has(l.id)).map((l) => l.name.toLowerCase());
+        setTimeout(() => setBanner(`Ticked ${ticked.length} ${ticked.length === 1 ? 'thing' : 'things'} off your shopping list.${still.length ? ` Still need: ${still.slice(0, 5).join(', ')}${still.length > 5 ? '…' : ''}.` : ' All done.'}`), 50);
+      }
+    }
+  }, [setStock, setKit, setProducts, setIdeas, setShopList]);
 
   // Names already in the kitchen, so the AI reuses them rather than making duplicates.
   const knownNames = useRef([]);
@@ -364,13 +380,32 @@ export default function App() {
     getIdea(false);
   }, [mounted, current, settings.autoIdea, stock.length, idea, ideaState, ideaKey, getIdea]);
 
-  function addToList(names, why = 'For a recipe') {
-    setShopList((list) => {
-      const have = new Set(list.map((l) => l.name.toLowerCase()));
-      const add = names.filter((n) => n && !have.has(n.toLowerCase())).map((n) => ({ id: newId(), name: n, why, done: false }));
-      return [...list, ...add];
-    });
-    setBanner(`Added ${names.length === 1 ? names[0].toLowerCase() : `${names.length} things`} to your shopping list.`);
+  // Add things to the shopping list. Each can be a name, or a stock item (so we know its aisle and usual amount).
+  function addToList(things, why = 'For a recipe', { quiet = false, findOptions = false } = {}) {
+    const list = shopRef.current;
+    const added = [];
+    const fresh = things
+      .map((t) => (typeof t === 'string' ? { name: t } : t))
+      .filter((t) => t && t.name && !list.some((l) => !l.done && matchesListItem(l, t.name)) && !added.some((x) => x.name.toLowerCase() === t.name.toLowerCase()))
+      .map((t) => {
+        const item = { id: newId(), name: t.name, why: t.why || why, done: false, aisle: aisleOf(t.name, t), qty: t.qty || '', addedAt: Date.now() };
+        added.push(item);
+        return item;
+      });
+    if (fresh.length) setShopList((l) => [...l.filter((x) => !fresh.some((f) => f.name.toLowerCase() === x.name.toLowerCase() && x.done)), ...fresh]);
+    if (findOptions) fresh.forEach(findShopOptions);
+    if (!quiet) setBanner(fresh.length ? `Added ${fresh.length === 1 ? fresh[0].name.toLowerCase() : `${fresh.length} things`} to your shopping list.` : 'Already on your shopping list.');
+    return fresh;
+  }
+
+  // "Roast chicken" → a few sensible things to buy.
+  function findShopOptions(item) {
+    const patch = (p) => setShopList((l) => l.map((x) => (x.id === item.id ? { ...x, ...p } : x)));
+    patch({ optionsState: 'loading' });
+    const shop = shopById(profile.supermarket);
+    postJson('/api/shop', { item: item.name, why: item.why, shop: shop ? shop.name : '', household: profile.household, dietary: profile.dietary })
+      .then((r) => patch({ options: r.options || [], optionsState: 'ready' }))
+      .catch(() => patch({ optionsState: 'error' }));
   }
 
   function cooked(changes = []) {
@@ -402,6 +437,14 @@ export default function App() {
       return next;
     });
     autoTried.current[ideaKey] = true;
+    const doneItems = changes
+      .map((c) => stock.find((s) => s.id === c.id))
+      .filter((x) => x && msgDone.includes(x.name) && !shopRef.current.some((l) => !l.done && matchesListItem(l, x.name)));
+    setBannerAction(
+      doneItems.length
+        ? { label: `Add ${doneItems.length === 1 ? doneItems[0].name.toLowerCase() : 'them'} to the shopping list`, run: () => addToList(doneItems.map((d) => ({ name: d.name, area: d.area, category: d.category, why: 'Finished it' }))) }
+        : null
+    );
     setBanner(
       msgTaken.length || msgDone.length
         ? `Nice one, Chef. ${[msgTaken.length ? `Taken off ${msgTaken.join(', ')}.` : '', msgDone.length ? `Finished: ${msgDone.join(', ')}.` : ''].filter(Boolean).join(' ')}`
@@ -437,6 +480,7 @@ export default function App() {
   const showMenu = ['home', 'kitchen', 'products', 'shop'].includes(current);
   const go = (s) => () => {
     setBanner('');
+    setBannerAction(null);
     setScreen(s);
   };
   const mealName = MEALS[mealKey];
@@ -445,6 +489,8 @@ export default function App() {
     <div className="app">
       {current === 'welcome' && (
         <Welcome
+          supermarket={profile.supermarket}
+          setSupermarket={(id) => setProfile({ ...profile, supermarket: id })}
           onTour={() => startAdd('kitchen')}
           onSkip={() => {
             setOnboarded(true);
@@ -494,18 +540,24 @@ export default function App() {
             setBanner('');
             setScreen('recipe');
           }}
-          onAddToList={(names) => addToList(names)}
+          onAddToList={(names) => addToList(names, 'For a recipe', { findOptions: true })}
           onTour={() => startAdd('kitchen')}
           banner={banner}
+          bannerAction={bannerAction}
+          onBannerAction={() => {
+            if (bannerAction) bannerAction.run();
+            setBannerAction(null);
+          }}
           showUseUp={settings.useUp}
         />
       )}
 
-      {current === 'recipe' && <Recipe idea={idea} stock={stock} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, ideaBase())} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n)} />}
+      {current === 'recipe' && <Recipe idea={idea} stock={stock} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, ideaBase())} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
 
       {current === 'kitchen' && (
         <Kitchen
           stock={stock}
+          banner={banner}
           onEdit={(it) => setEditing({ item: it, isKit: false })}
           onAdd={() => startAdd('kitchen')}
         />
@@ -520,7 +572,17 @@ export default function App() {
         />
       )}
 
-      {current === 'shop' && <Shop list={shopList} setList={setShopList} stock={[...stock, ...products]} />}
+      {current === 'shop' && (
+        <Shop
+          list={shopList}
+          setList={setShopList}
+          stock={[...stock, ...products]}
+          shop={shopById(profile.supermarket)}
+          onAdd={(things, why, opts) => addToList(things, why, { quiet: true, ...opts })}
+          onFindOptions={findShopOptions}
+          onPickShop={() => setScreen('account')}
+        />
+      )}
 
       {current === 'kit' && (
         <Kit
