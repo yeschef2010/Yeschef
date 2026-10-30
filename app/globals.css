@@ -338,3 +338,6 @@ label.lbl { font-size: 14px; font-weight: 700; color: var(--text-2); }
 
 a.btn, a.btn:visited { color: #fff; }
 .aisle .cat-label { margin: 4px 0 0; }
+
+.low-card { padding-top: 4px; padding-bottom: 4px; }
+.low-head { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px; background: none; border: none; padding: 0; color: var(--tomato); }

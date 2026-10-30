@@ -570,6 +570,7 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
   const [copied, setCopied] = useState('');
   const [unfolded, setUnfolded] = useState({});
   const [shopping, setShopping] = useState(false);
+  const [lowOpen, setLowOpen] = useState(false);
   const open = list.filter((l) => !l.done);
   const done = list.filter((l) => l.done);
   const onList = (name) => open.some((l) => l.name.toLowerCase() === name.toLowerCase());
@@ -623,8 +624,12 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
       </div>
 
       {suggestions.length > 0 && (
-        <div className="card tight">
-          <p className="eyebrow orange">Running low</p>
+        <div className="card tight low-card">
+          <button className="low-head" aria-expanded={lowOpen} onClick={() => setLowOpen(!lowOpen)}>
+            <span className="eyebrow orange">Running low · {suggestions.length}</span>
+            <Chevron open={lowOpen} />
+          </button>
+          {lowOpen && (
           <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
             {suggestions.map((s) => (
               <button key={s.id} className="btn sm ghost" style={{ height: 36 }} onClick={() => onAdd([{ name: s.name, area: s.area, category: s.category, qty: '' }], `Running low${s.qty ? ` · ${s.qty} left` : ''}`)}>
@@ -632,6 +637,7 @@ export function Shop({ list, setList, stock, shop, onAdd, onFindOptions, onPickS
               </button>
             ))}
           </div>
+          )}
         </div>
       )}
 
