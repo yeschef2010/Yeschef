@@ -1,3 +1,4 @@
+import { guardAi } from '@/lib/guard';
 import { ask as askAi, getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
 
 export const maxDuration = 30;
@@ -22,6 +23,8 @@ const SCHEMA = {
 
 // "Roast chicken" → a few sensible things to buy, each searched at the person's supermarket.
 export async function POST(req) {
+  const blocked = await guardAi(req);
+  if (blocked) return blocked;
   const client = getClient();
   if (!client) return noKeyResponse();
   try {

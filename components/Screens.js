@@ -97,6 +97,57 @@ export function Welcome({ onTour, onSkip, supermarket, setSupermarket, onJoin, j
   );
 }
 
+// Invite-only while testing: an invite code, or a household code from someone already in.
+export function AccessGate({ onCode, onJoin, joinPrefill = '' }) {
+  const [mode, setMode] = useState(joinPrefill ? 'join' : 'invite');
+  const [code, setCode] = useState(joinPrefill);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (joinPrefill) {
+      setMode('join');
+      setCode(joinPrefill);
+    }
+  }, [joinPrefill]);
+  async function go() {
+    setBusy(true);
+    setErr('');
+    try {
+      await (mode === 'join' ? onJoin(code) : onCode(code));
+    } catch (e) {
+      setErr(e.message || 'That didn’t work. Check the code and try again.');
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="screen welcome" style={{ paddingTop: 44 }}>
+      <div className="welcome-logo">
+        <Logo width={150} />
+      </div>
+      <h1 className="greeting">Hi Chef!</h1>
+      <p className="lead" style={{ marginTop: -6 }}>Yes Chef! is invite-only while we test it.</p>
+      <div className="seg" role="group" aria-label="How are you getting in?">
+        <button aria-pressed={mode === 'invite'} onClick={() => { setMode('invite'); setErr(''); }}>Invite code</button>
+        <button aria-pressed={mode === 'join'} onClick={() => { setMode('join'); setErr(''); }}>Household code</button>
+      </div>
+      <div className="card" style={{ gap: 10 }}>
+        <p className="h3">{mode === 'join' ? 'Household code' : 'Invite code'}</p>
+        <p className="sub">
+          {mode === 'join' ? 'The code from the invite someone in your house sent you, e.g. ABCD-1234.' : 'The invite code you were given.'}
+        </p>
+        <div className="row">
+          <label htmlFor="gate-code" className="sr-only">{mode === 'join' ? 'Household code' : 'Invite code'}</label>
+          <input id="gate-code" className="input" autoCapitalize="characters" autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && code.trim()) go(); }} />
+          <button className="btn sm" disabled={busy || !code.trim()} onClick={go}>
+            {busy ? 'Checking…' : mode === 'join' ? 'Join' : 'Let me in'}
+          </button>
+        </div>
+        {err && <p className="error">{err}</p>}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Drinks you can make from what's in ---------- */
 export function DrinksCard({ stock, title = 'Ready to pour' }) {
   const drinks = drinksYouCanMake(stock);

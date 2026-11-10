@@ -6,9 +6,10 @@ import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, tot
 import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
 import AddItems from './Tour';
 import { parseHousehold } from '@/lib/servings';
+import { authHeaders, getAccess, noteRefused, setAccess } from '@/lib/access';
 import { checkList, estimate, withEstimates } from '@/lib/drift';
 import { aisleOf, matchesListItem, shopById } from '@/lib/shops';
-import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
+import { About, AccessGate, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
 import { Basket, Calendar, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
 import Plan from './Plan';
 import { dayLong, dayShort, defrostFor, eatersText, isoDate, savedFor, weekNeeds, weeknights } from '@/lib/plan';
@@ -16,7 +17,7 @@ import { dayLong, dayShort, defrostFor, eatersText, isoDate, savedFor, weekNeeds
 const FRIENDLY_FAIL = 'Sorry Chef, I couldn’t reach the kitchen brain. Check your signal and try again.';
 
 async function postJson(url, body) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
   let data = null;
   try {
     data = await res.json();
@@ -24,6 +25,7 @@ async function postJson(url, body) {
     // ignore
   }
   if (!res.ok) {
+    noteRefused(res, data);
     const err = new Error((data && data.message) || FRIENDLY_FAIL);
     err.detail = (data && data.detail) || (data ? '' : `HTTP ${res.status}`);
     throw err;
@@ -227,6 +229,37 @@ export default function App() {
       setStock((l) => l.map((x) => (x.id === id ? { ...x, countedAt: Date.now(), status: answer === 'low' ? 'Low' : null } : x)));
       if (answer === 'low') addToList([{ name: item.name, area: item.area, category: item.category, why: 'Running low' }], 'Running low', { quiet: true });
     }
+  }
+
+  /* ----- Invite-only access ----- */
+  // 'ok' | 'needed'. Only shown when an invite code is set in Vercel and this phone has no way in yet.
+  const [gate, setGate] = useState('ok');
+  useEffect(() => {
+    if (!mounted) return undefined;
+    const need = () => setGate('needed');
+    window.addEventListener('yc-need-access', need);
+    if (!household && !getAccess()) {
+      fetch('/api/access')
+        .then((r) => r.json())
+        .then((d) => d && d.required && setGate('needed'))
+        .catch(() => {});
+    }
+    return () => window.removeEventListener('yc-need-access', need);
+  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function enterInvite(code) {
+    const res = await fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data && data.message) || 'That invite code isn’t right.');
+    setAccess(code);
+    setGate('ok');
+  }
+
+  async function joinFromGate(code) {
+    await sync.join(code);
+    setGate('ok');
+    setOnboarded(true);
+    setScreen('home');
   }
 
   /* ----- Reminders (phone notifications) ----- */
@@ -710,6 +743,13 @@ export default function App() {
   }
 
   if (!mounted) return <div className="app" />;
+  if (gate === 'needed') {
+    return (
+      <div className="app">
+        <AccessGate onCode={enterInvite} onJoin={joinFromGate} joinPrefill={joinPrefill} />
+      </div>
+    );
+  }
 
   const tabs = ['home', 'plan', 'kitchen', 'products', 'shop', 'kit', 'account', 'settings', 'about'];
   const showTabs = tabs.includes(current);

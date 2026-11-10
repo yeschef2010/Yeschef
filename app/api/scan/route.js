@@ -1,3 +1,4 @@
+import { guardAi } from '@/lib/guard';
 import { AREA_CATEGORIES } from '@/lib/helpers';
 import { ask as askAi, withRetry, getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKeyResponse, failResponse } from '@/lib/ai';
 
@@ -55,6 +56,8 @@ Rules:
 - If you can't see or hear anything useful, return {"items":[]}.`;
 
 export async function POST(req) {
+  const blocked = await guardAi(req);
+  if (blocked) return blocked;
   const client = getClient();
   if (!client) return noKeyResponse();
 

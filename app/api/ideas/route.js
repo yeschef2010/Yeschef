@@ -1,3 +1,4 @@
+import { guardAi } from '@/lib/guard';
 import { ask as askAi, getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
 
 export const maxDuration = 60;
@@ -198,6 +199,8 @@ async function ask(client, prompt, maxTokens, schema) {
 }
 
 export async function POST(req) {
+  const blocked = await guardAi(req);
+  if (blocked) return blocked;
   const client = getClient();
   if (!client) return noKeyResponse();
 
