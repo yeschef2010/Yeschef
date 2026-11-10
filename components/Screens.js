@@ -1031,7 +1031,9 @@ function HouseholdCard({ household, sync, joinPrefill, onJoined }) {
   }
 
   async function invite() {
-    const link = `${window.location.origin}/?join=${household}`;
+    // Always the public main address: Vercel's per-version addresses ask for a Vercel login.
+    const main = process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
+    const link = `${main ? `https://${main}` : window.location.origin}/?join=${household}`;
     const text = `Join our kitchen on Yes Chef! Open this link, then tap Add to Home Screen: ${link}  (or enter code ${household})`;
     try {
       if (navigator.share) await navigator.share({ title: 'Yes Chef! invite', text });
