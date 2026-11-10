@@ -5,6 +5,7 @@ import { useHouseholdSync } from '@/lib/sync';
 import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, totalOf } from '@/lib/amounts';
 import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
 import AddItems from './Tour';
+import { splitPastedOrder } from '@/lib/media';
 import { parseHousehold } from '@/lib/servings';
 import { authHeaders, getAccess, noteRefused, setAccess } from '@/lib/access';
 import { checkList, estimate, withEstimates } from '@/lib/drift';
@@ -509,11 +510,13 @@ export default function App() {
 
     // Send photos a few at a time so each request stays small and the labels stay sharp. Each file goes on its own.
     const batches = [];
-    for (let i = 0; i < images.length; i += 3) batches.push({ images: images.slice(i, i + 3), docs: [] });
-    docs.forEach((d) => batches.push({ images: [], docs: [d] }));
-    if (batches.length === 0) batches.push({ images: [], docs: [] });
+    for (let i = 0; i < images.length; i += 3) batches.push({ images: images.slice(i, i + 3), docs: [], note });
+    docs.forEach((d) => batches.push({ images: [], docs: [d], note }));
+    // A pasted order on its own is read in small pieces, side by side.
+    if (batches.length === 0 && opts.pasted) splitPastedOrder(note).forEach((piece) => batches.push({ images: [], docs: [], note: piece }));
+    if (batches.length === 0) batches.push({ images: [], docs: [], note });
 
-    Promise.allSettled(batches.map((b) => postJson('/api/scan', { area, images: b.images, docs: b.docs, note, where: opts.where || null, known: knownNames.current })))
+    Promise.allSettled(batches.map((b) => postJson('/api/scan', { area, images: b.images, docs: b.docs, note: b.note, where: opts.where || null, known: knownNames.current })))
       .then((results) => {
         const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
         if (ok.length === 0) throw results[0].reason || new Error(FRIENDLY_FAIL);

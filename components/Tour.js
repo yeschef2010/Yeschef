@@ -32,6 +32,8 @@ export default function AddItems({ mode: addMode = 'kitchen', onSubmit, onDone, 
   const [where, setWhere] = useState('Anywhere');
   const [images, setImages] = useState([]);
   const [receipt, setReceipt] = useState({ images: [], docs: [] });
+  const [pasted, setPasted] = useState('');
+  const [pasting, setPasting] = useState(false);
   const [note, setNote] = useState('');
   const [interim, setInterim] = useState('');
   const [recording, setRecording] = useState(false);
@@ -201,7 +203,8 @@ export default function AddItems({ mode: addMode = 'kitchen', onSubmit, onDone, 
   }
 
   const heard = [note, interim].filter(Boolean).join(' ');
-  const receiptCount = receipt.images.length + receipt.docs.length;
+  const hasPaste = pasted.trim().length > 20;
+  const receiptCount = receipt.images.length + receipt.docs.length + (hasPaste ? 1 : 0);
   const hasContent = images.length > 0 || !!heard.trim() || receiptCount > 0;
 
   // Send everything off to be read, then show what was found.
@@ -214,9 +217,12 @@ export default function AddItems({ mode: addMode = 'kitchen', onSubmit, onDone, 
     if (imagesRef.current.length || finalNote.trim()) {
       ids.push(onSubmit(cfg.scanArea, imagesRef.current, finalNote, null, [], { where: whereHint }));
     }
-    if (receiptCount) ids.push(onSubmit('Receipt', receipt.images, '', null, receipt.docs, {}));
+    if (receipt.images.length || receipt.docs.length) ids.push(onSubmit('Receipt', receipt.images, '', null, receipt.docs, {}));
+    if (hasPaste) ids.push(onSubmit('Receipt', [], pasted.trim(), null, [], { pasted: true }));
     setImages([]);
     setReceipt({ images: [], docs: [] });
+    setPasted('');
+    setPasting(false);
     setNote('');
     setInterim('');
     setMode('video');
@@ -335,16 +341,29 @@ export default function AddItems({ mode: addMode = 'kitchen', onSubmit, onDone, 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch', padding: 20, width: '100%' }}>
                 <p className="on-dark" style={{ fontSize: 18, fontWeight: 800, textAlign: 'center' }}>Got a receipt? I’ll read it</p>
                 <p className="on-dark" style={{ fontSize: 14, textAlign: 'center', opacity: 0.85 }}>
-                  Snap a paper receipt, or upload a screenshot or PDF of an online order. Long receipt? Take it in two halves.
+                  Snap a paper receipt, upload a screenshot or PDF, or copy the list of items from your order email and paste it here.
                 </p>
                 <label className="btn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--tomato)' }}>
                   {busy ? 'Reading…' : 'Photo of receipt'}
                   <input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(e) => { addReceipt(e.target.files); e.target.value = ''; }} />
                 </label>
-                <label className="btn ghost" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <label className="btn ghost" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8F5EC', color: 'var(--forest)' }}>
                   Upload a file
                   <input className="sr-only" type="file" accept="image/*,application/pdf,.pdf" multiple onChange={(e) => { addReceipt(e.target.files); e.target.value = ''; }} />
                 </label>
+                {pasting || hasPaste ? (
+                  <textarea
+                    className="paste-box"
+                    value={pasted}
+                    onChange={(e) => setPasted(e.target.value)}
+                    placeholder="Paste your order here"
+                    aria-label="Pasted order"
+                    rows={6}
+                    autoFocus
+                  />
+                ) : (
+                  <button className="btn ghost" style={{ background: '#F8F5EC', color: 'var(--forest)' }} onClick={() => setPasting(true)}>Paste an order email</button>
+                )}
                 {camError && <p className="error">{camError}</p>}
               </div>
             )}
