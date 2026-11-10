@@ -78,7 +78,27 @@ export function MenuIcon({ width = 28, height = 30 }) {
   );
 }
 
-// The Yes Chef! fridge logo.
+// The Yes Chef! logo: a classic tomato with "Yes Chef!" in handwriting.
+export function TomatoMark({ size = 48 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 200 200" aria-hidden="true" style={{ display: 'block' }}>
+      <path d="M100 52 C46 52 22 90 26 126 C30 164 62 186 100 186 C138 186 170 164 174 126 C178 90 154 52 100 52 Z" fill="#EB4933" />
+      <path d="M100 52 C84 52 72 56 62 62 C70 70 70 90 66 120 C60 100 50 84 40 76 C50 64 72 54 100 52 Z" fill="#D63A26" opacity="0.6" />
+      <ellipse cx="62" cy="102" rx="13" ry="22" fill="#F7907F" transform="rotate(-28 62 102)" />
+      <ellipse cx="70" cy="136" rx="5" ry="8" fill="#F7907F" transform="rotate(-28 70 136)" />
+      <path d="M100 66 L82 74 L60 68 L74 84 L66 100 L88 92 L100 104 L112 92 L134 100 L126 84 L140 68 L118 74 Z" fill="#57933C" stroke="#3F6E2A" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M100 70 C100 50 104 36 116 26 C122 22 128 24 126 30" fill="none" stroke="#3F6E2A" strokeWidth="7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function Logo({ width = 220 }) {
-  return <img src="/logo.png" alt="Yes Chef!" width={width} height={Math.round((width * 640) / 637)} style={{ display: 'block' }} />;
+  return (
+    <div role="img" aria-label="Yes Chef!" style={{ width, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <TomatoMark size={Math.round(width * 0.62)} />
+      <span style={{ fontFamily: 'var(--hand), cursive', fontWeight: 700, fontSize: Math.round(width * 0.27), lineHeight: 0.95, color: '#153D2C', whiteSpace: 'nowrap' }}>
+        Yes Chef<span style={{ color: '#EB4933' }}>!</span>
+      </span>
+    </div>
+  );
 }
