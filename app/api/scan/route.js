@@ -1,5 +1,5 @@
 import { AREA_CATEGORIES } from '@/lib/helpers';
-import { withRetry, getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKeyResponse, failResponse } from '@/lib/ai';
+import { ask as askAi, withRetry, getClient, MODEL, parseJson, replyText, imageBlock, documentBlock, noKeyResponse, failResponse } from '@/lib/ai';
 
 export const maxDuration = 60;
 
@@ -126,15 +126,14 @@ export async function POST(req) {
     // The AI fills in a form (a tool) rather than writing JSON as text, so long lists come back in shape.
     content[content.length - 1].text += '\n\nGive your answer by calling the "answer" tool with the items list (don\'t write it as text).';
     const data = await withRetry(async () => {
-      const msg = await client.messages.create({
-        model: MODEL,
+      const msg = await askAi(client, {
         max_tokens: 8000,
         system:
           'You are the stock-taking assistant inside Yes Chef!, a UK kitchen app for busy families. You turn quick videos, photos and spoken notes into a tidy stock list of food, drink and household products. Be accurate and never invent items you have no evidence for.',
         tools: [{ name: 'answer', description: 'Give the items you found.', input_schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } } }, required: ['items'] } }],
         tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content }],
-      });
+      }, {});
       const used = (msg.content || []).find((b) => b.type === 'tool_use');
       if (used && used.input && Array.isArray(used.input.items)) {
         if (msg.stop_reason === 'max_tokens') throw new Error('Reply cut short (JSON incomplete)');

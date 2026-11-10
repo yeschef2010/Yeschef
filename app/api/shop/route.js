@@ -1,4 +1,4 @@
-import { getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
+import { ask as askAi, getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
 
 export const maxDuration = 30;
 
@@ -37,14 +37,13 @@ Each "name" is what to type into the supermarket search: plain words, 2 to 4 wor
 
 Give your answer by calling the "answer" tool.`;
     const r = await withRetry(async () => {
-      const msg = await client.messages.create({
-        model: MODEL,
+      const msg = await askAi(client, {
         max_tokens: 800,
         system: 'You help a busy UK family shop sensibly at the supermarket. Be brief and practical.',
         tools: [{ name: 'answer', description: 'Give your answer by filling this in.', input_schema: SCHEMA }],
         tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: prompt }],
-      });
+      }, { fast: true });
       const used = (msg.content || []).find((x) => x.type === 'tool_use');
       return used && used.input ? used.input : parseJson(replyText(msg));
     });

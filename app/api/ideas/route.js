@@ -1,4 +1,4 @@
-import { getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
+import { ask as askAi, getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
 
 export const maxDuration = 60;
 
@@ -116,15 +116,14 @@ const SCHEMAS = {
 
 async function ask(client, prompt, maxTokens, schema) {
   return withRetry(async () => {
-    const msg = await client.messages.create({
-      model: MODEL,
+    const msg = await askAi(client, {
       max_tokens: maxTokens,
       system: SYSTEM,
       tools: [{ name: 'answer', description: 'Give your answer by filling this in.', input_schema: SCHEMAS[schema] }],
       // This model doesn't allow forcing a tool, so offer it and ask for it in the prompt.
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: prompt }],
-    });
+    }, { fast: schema === 'cards' });
     const used = (msg.content || []).find((b) => b.type === 'tool_use');
     if (used && used.input && typeof used.input === 'object') {
       if (msg.stop_reason === 'max_tokens') throw new Error('Reply cut short (JSON incomplete)');
@@ -195,7 +194,7 @@ Rules:
 
 Give exactly three ideas by calling the "answer" tool (don't write them as text), like this example:
 {"ideas": [{"type": "useup", "title": "Chorizo and chickpea one-pan", "time": "15 mins", "tag": "One pan, hob only", "why": "Uses up your chorizo before it goes off.", "missing": [], "lights": {"fat": "medium", "saturates": "medium", "sugar": "low", "salt": "high"}, "prep": ""}]}`,
-      2500,
+      4000,
       'cards'
     );
     const list = (Array.isArray(r.ideas) ? r.ideas : []).filter((x) => x && x.title).slice(0, 3).map(cleanCard);
