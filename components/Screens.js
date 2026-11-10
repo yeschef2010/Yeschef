@@ -151,14 +151,14 @@ export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onChe
 
   return (
     <div className="screen" style={{ paddingTop: 28 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
-        <p className="small" style={{ fontWeight: 700 }}>
-          {dateText}
-        </p>
-        <h2 className="h2" style={{ fontSize: 32 }}>
-          {meal.greeting}
+      <div className="masthead">
+        <p className="masthead-date">{dateText}</p>
+        <h1 className="greeting">
+          {meal.greeting.replace(/,?\s*Chef$/, '')},
+          <br />
+          <em>Chef</em>
           <span className="dot">.</span>
-        </h2>
+        </h1>
       </div>
 
       {banner && (
@@ -236,7 +236,9 @@ export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onChe
             <>
               <div className="ideas">
                 {ideas.map((idea, i) => (
-                  <button key={i} className="idea-card" onClick={() => onCook(i)}>
+                  <button key={i} className={`idea-card n${i + 1}`} onClick={() => onCook(i)}>
+                    <span className="idea-num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="idea-body">
                     <span className="eyebrow">
                       {IDEA_TYPES[idea.type] ? (idea.type === 'quick' && mode === 'fun' ? 'Easiest' : IDEA_TYPES[idea.type]) : 'Idea'}
                       {idea.time ? ` · ${idea.time}` : ''}
@@ -251,6 +253,7 @@ export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onChe
                     <span className="idea-foot">
                       <Lights lights={idea.lights} small />
                       {idea.missing && idea.missing.length > 0 && <span className="idea-grab">Grab: {listJoin(idea.missing.map((m) => m.toLowerCase()))}</span>}
+                    </span>
                     </span>
                   </button>
                 ))}

@@ -374,3 +374,90 @@ a.btn, a.btn:visited { color: #fff; }
 .still-btns { display: flex; gap: 4px; flex-shrink: 0; }
 .still-btns button { height: 34px; padding: 0 10px; border-radius: 17px; border: 1.5px solid var(--line-2); background: var(--card); color: var(--forest); font-weight: 800; font-size: 13px; }
 .still-btns button.gone { color: var(--tomato); border-color: #F2B8AE; }
+
+
+/* ============================================================
+   Sunday Supplement: magazine look. Fraunces serif headlines,
+   thin rules instead of boxes, small tracked capitals, pills.
+   ============================================================ */
+:root { --serif: 'Fraunces', Georgia, 'Times New Roman', serif; --rule: #153D2C; --rule-soft: #D8D1BE; }
+
+.h1, .h2, .h3, .greeting, .idea-title, .section-head, .stepper-n { font-family: var(--serif); }
+.h1 { font-weight: 800; letter-spacing: -0.03em; }
+.h2 { font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.h3 { font-weight: 600; letter-spacing: -0.01em; }
+.lead { font-family: var(--serif); }
+.eyebrow { letter-spacing: 0.13em; font-size: 11.5px; }
+
+/* Masthead */
+.masthead { display: flex; flex-direction: column; gap: 14px; padding-right: 56px; }
+.masthead-date { margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; border-bottom: 1px solid var(--rule); padding-bottom: 9px; margin-right: -56px; padding-right: 56px; }
+.greeting { margin: 0; font-weight: 800; font-size: 56px; line-height: 0.92; letter-spacing: -0.035em; color: var(--forest); }
+.greeting em { font-style: italic; font-weight: 400; }
+
+/* Cards become rule-separated sections; tinted notes keep a soft square tint */
+.card { background: transparent; box-shadow: none; border-radius: 0; border-top: 1px solid var(--rule); padding: 14px 0 4px; }
+.card.orange, .card.honey, .card.green, .card.sage { border-top: none; border-radius: 3px; padding: 12px 14px; }
+.card.orange, .card.honey { background: #F7E7C3; }
+.card.green { background: #E4EEDC; }
+.sheet .card { border-top-color: var(--rule-soft); }
+
+/* Buttons: pills with small tracked capitals */
+.btn { border-radius: 999px; font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.btn.sm { border-radius: 999px; font-size: 12.5px; }
+.btn.ghost { background: transparent; border: 1.5px solid var(--forest); }
+.btn.quiet { text-decoration: underline; text-underline-offset: 4px; }
+.icon-btn { background: transparent; border-color: var(--rule-soft); }
+
+/* Quick / Fun: underlined tabs between rules */
+.seg { display: flex; gap: 22px; background: transparent; border-radius: 0; padding: 0; border-top: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); }
+.seg button { height: 46px; border-radius: 0; padding: 0; background: transparent; font-size: 12.5px; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); border-bottom: 3px solid transparent; }
+.seg button[aria-pressed='true'] { background: transparent; color: var(--forest); border-bottom-color: var(--forest); }
+
+/* Inputs: a single underline */
+.input, .textarea { border: none; border-bottom: 1.5px solid var(--forest); border-radius: 0; background: transparent; padding: 0 2px; }
+.textarea { border: 1.5px solid var(--rule-soft); border-radius: 3px; padding: 10px; }
+select.input { background: transparent; }
+.ask .input { font-family: var(--serif); font-style: italic; font-size: 18px; }
+.ask .input::placeholder { font-style: italic; }
+.ask-chip { border-radius: 3px; background: #E4EEDC; }
+
+/* Ideas: numbered list, 01 02 03 */
+.ideas { gap: 0; border-bottom: 1px solid var(--rule); }
+.idea-card { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; background: transparent; border: none; border-top: 1px solid var(--rule-soft); border-radius: 0; padding: 16px 0; }
+.idea-card.n1 { border-top-color: var(--rule); }
+.idea-num { font-family: var(--serif); font-weight: 400; font-size: 46px; line-height: 0.9; color: var(--tomato); }
+.idea-card.n2 .idea-num { color: var(--leaf); }
+.idea-card.n3 .idea-num { color: #C99A2E; }
+.idea-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.idea-title { font-weight: 600; font-size: 22px; line-height: 1.12; letter-spacing: -0.01em; }
+.idea-why { color: var(--text-2); }
+.idea-prep { border-radius: 3px; background: #F7E7C3; }
+
+/* Kitchen sections and groups: ruled, not boxed */
+.section { background: transparent; box-shadow: none; border-radius: 0; border-top: 1px solid var(--rule); }
+.section-head { padding: 0 2px; font-size: 22px; font-weight: 600; height: 60px; }
+.section-body { padding: 0 0 12px; }
+.cat-head { background: transparent; border-radius: 0; border-bottom: 1px solid var(--rule-soft); padding: 0 2px; }
+.line { border-radius: 4px; }
+.tag { border-radius: 2px; }
+.chip { border-color: var(--forest); }
+.stepper { border-radius: 3px; background: transparent; border-color: var(--rule-soft); }
+.light { border-radius: 3px; }
+
+/* Menu button: flat */
+.menu-btn { background: transparent; border: none; box-shadow: none; }
+
+/* Tab bar: tracked capitals with a tomato dot for the current page */
+.tabbar { background: var(--cream); border-top: 1px solid var(--rule); }
+.tabbar button svg { display: none; }
+.tabbar button { gap: 7px; font-size: 11.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.tabbar button::before { content: ''; width: 6px; height: 6px; border-radius: 3px; background: transparent; }
+.tabbar button[aria-current='page'] { color: var(--forest); }
+.tabbar button[aria-current='page']::before { background: var(--tomato); }
+
+/* Sheets: square-ish top, rule under the handle */
+.sheet { border-radius: 14px 14px 0 0; }
+.undo-bar { border-radius: 3px; }
+
+.section-head .meta { font-family: 'Nunito Sans', system-ui, sans-serif; font-size: 13px; }
