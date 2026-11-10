@@ -76,7 +76,41 @@ export function DrinksCard({ stock, title = 'Ready to pour' }) {
 }
 
 /* ---------- Main meal screen ---------- */
-export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
+function AskBox({ request, onAsk, busy, meal }) {
+  const [text, setText] = useState('');
+  const go = () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    onAsk(t);
+    setText('');
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <form
+        className="ask"
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          go();
+        }}
+      >
+        <label htmlFor="ask" className="sr-only">What do you fancy?</label>
+        <input id="ask" className="input" placeholder="Fancy anything? e.g. high protein" value={text} onChange={(e) => setText(e.target.value)} enterKeyHint="search" />
+        <button className="btn sm" type="submit" disabled={!text.trim() || busy}>Go</button>
+      </form>
+      {request && (
+        <div className="ask-chip">
+          <span>Ideas for: <strong>{request}</strong></span>
+          <button onClick={() => onAsk('')} aria-label="Clear and go back to everyday ideas" disabled={busy}>
+            <Close />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, request = '', onAsk, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
   const meal = MEALS[mealKey];
   const urgent = stock.filter((s) => s.area !== 'Spice rack' && !s.status && stockTag(s).cls === 'red');
   const empty = stock.length === 0;
@@ -131,6 +165,8 @@ export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaErro
               Fun in the kitchen
             </button>
           </div>
+
+          {onAsk && <AskBox request={request} onAsk={onAsk} busy={ideaState === 'loading'} meal={mealKey === 'tomorrow' ? 'dinner' : meal.thinking} />}
 
           {mealKey === 'tomorrow' && (
             <p className="sub" style={{ marginBottom: -4 }}>Dinner’s done for today. Here’s what you could have tomorrow, and anything to do tonight.</p>

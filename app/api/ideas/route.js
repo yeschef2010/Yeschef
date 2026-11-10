@@ -46,6 +46,7 @@ function context(b) {
 Dietary needs: ${b.dietary || 'none given'}
 Style: ${mode === 'quick' ? 'Quick and easy: 15 minutes or less where possible, few pans, minimal washing up.' : 'Fun in the kitchen: they have time and want something a bit special, but still realistic at home.'}
 ${b.context ? `Context: ${b.context}` : ''}
+${b.request ? `They've asked for: "${String(b.request).slice(0, 120)}". Every idea must clearly fit this, and "why" should say how it does.` : ''}
 
 Their stock:
 ${stockLines || '(nothing logged yet)'}

@@ -379,16 +379,19 @@ export default function App() {
       .catch(() => patch({ detail: 'error' }));
   }, [setIdeas]);
 
-  const getIdea = useCallback(async (avoidCurrent) => {
+  // request: what they've asked for ("high protein"). Left out, it keeps the current one (for "Three more").
+  const getIdea = useCallback(async (avoidCurrent, request) => {
     setIdeaState('loading');
     setIdeaError('');
-    const base = ideaBase();
+    const ask = (request === undefined ? (ideaSet && ideaSet.request) || '' : request).trim().slice(0, 120);
+    const base = { ...ideaBase(), request: ask };
     const key = ideaKey;
     try {
-      const avoid = avoidCurrent && ideaSet ? [...(ideaSet.avoid || []), ...ideaSet.ideas.map((i) => i.title)].slice(-12) : [];
+      const sameAsk = ideaSet && (ideaSet.request || '') === ask;
+      const avoid = avoidCurrent && ideaSet && sameAsk ? [...(ideaSet.avoid || []), ...ideaSet.ideas.map((i) => i.title)].slice(-12) : [];
       const data = await postJson('/api/ideas', { ...base, step: 'cards', avoid });
       const cards = (data.ideas || []).map((c) => ({ ...c, detail: 'loading' }));
-      setIdeas((all) => ({ ...all, [key]: { ideas: cards, avoid } }));
+      setIdeas((all) => ({ ...all, [key]: { ideas: cards, avoid, request: ask } }));
       setIdeaIdx(0);
       setIdeaState('idle');
       cards.forEach((c, i) => loadRecipe(key, i, c, base));
@@ -560,6 +563,8 @@ export default function App() {
           }}
           onGetIdea={() => getIdea(false)}
           onAnother={() => getIdea(true)}
+          request={(ideaSet && ideaSet.request) || ''}
+          onAsk={(text) => getIdea(false, text)}
           onCook={(i) => {
             setIdeaIdx(i);
             setBanner('');
@@ -577,7 +582,7 @@ export default function App() {
         />
       )}
 
-      {current === 'recipe' && <Recipe idea={idea} stock={stock} eaters={eaters} onEaters={(e) => setProfile((p) => ({ ...p, adults: e.adults, kids: e.kids }))} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, ideaBase())} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
+      {current === 'recipe' && <Recipe idea={idea} stock={stock} eaters={eaters} onEaters={(e) => setProfile((p) => ({ ...p, adults: e.adults, kids: e.kids }))} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, { ...ideaBase(), request: (ideaSet && ideaSet.request) || '' })} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
 
       {current === 'kitchen' && (
         <Kitchen

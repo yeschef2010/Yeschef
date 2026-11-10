@@ -361,3 +361,8 @@ a.btn, a.btn:visited { color: #fff; }
 .stepper button { width: 34px; height: 34px; border-radius: 17px; border: none; background: var(--sage); color: var(--forest); font-size: 20px; font-weight: 800; line-height: 1; }
 .stepper button:disabled { opacity: 0.35; }
 .stepper-n { min-width: 18px; text-align: center; font-size: 17px; font-weight: 800; color: var(--forest); }
+
+.ask { display: flex; gap: 8px; }
+.ask .input { flex: 1; min-width: 0; }
+.ask-chip { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--sage); color: var(--forest); border-radius: 12px; padding: 6px 6px 6px 12px; font-size: 14.5px; }
+.ask-chip button { width: 32px; height: 32px; border-radius: 16px; border: none; background: rgba(255,255,255,0.6); color: var(--forest); display: flex; align-items: center; justify-content: center; }
