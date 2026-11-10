@@ -33,11 +33,31 @@ const cleanRecipe = (r) => ({
 const SYSTEM =
   "You are the kitchen assistant inside Yes Chef!, a UK app. The user is the chef; you're the helpful sous chef who does the admin. Suggest realistic, tasty family food that wastes nothing.";
 
+// Strict diets: take anything that breaks them out of the stock list, so the AI can't suggest it.
+const MEAT_FISH = /\b(chicken|beef|pork|lamb|mince|bacon|ham|sausages?|chipolatas?|chorizo|salami|pepperoni|prosciutto|pancetta|turkey|duck|venison|steak|burgers?|meatballs?|gammon|black pudding|fish|salmon|tuna|cod|haddock|mackerel|sardines?|anchov(y|ies)|prawns?|shrimp|sea bass|trout|crab|lobster|mussels|squid|scampi|fish fingers?|gelatine|lard|suet|stock cubes? \(chicken|beef\))\b/i;
+const ANIMAL = /\b(pesto|milk|cream|butter|cheese|cheddar|mozzarella|parmesan|feta|halloumi|brie|yogh?urt|cr[eè]me fra[iî]che|eggs?|honey|mayonnaise|mayo|ghee|custard|ice cream|whey)\b/i;
+const PLANT_OK = /\b(oat|soya|soy|almond|coconut|vegan|plant|dairy.?free|nut)\b/i;
+
+function dietRules(b) {
+  const said = `${b.request || ''} ${b.dietary || ''}`.toLowerCase();
+  const vegan = /\bvegan\b|plant.?based/.test(said);
+  const veggie = vegan || /\bvegetarian\b|\bveggie\b|no meat|meat.?free/.test(said);
+  return { vegan, veggie };
+}
+
+function allowed(item, { vegan, veggie }) {
+  const n = String(item.name || '');
+  if (veggie && MEAT_FISH.test(n) && !PLANT_OK.test(n)) return false;
+  if (vegan && ANIMAL.test(n) && !PLANT_OK.test(n)) return false;
+  return true;
+}
+
 function context(b) {
   const tomorrow = b.meal === 'tomorrow';
   const meal = tomorrow ? 'dinner' : b.meal || 'dinner';
   const mode = b.mode === 'fun' ? 'fun' : 'quick';
-  const stock = (b.stock || []).slice(0, 200);
+  const diet = dietRules(b);
+  const stock = (b.stock || []).filter((s) => allowed(s, diet)).slice(0, 200);
   const kit = (b.kit || []).slice(0, 60);
   const stockLines = stock
     .map((s) => `- ${s.name} (${s.qty || 'some'}; ${s.area}${s.daysLeft != null ? `; use within ${s.daysLeft} day(s)` : ''}${s.status ? `; ${s.status}` : ''})`)
@@ -46,7 +66,8 @@ function context(b) {
 Dietary needs: ${b.dietary || 'none given'}
 Style: ${mode === 'quick' ? 'Quick and easy: 15 minutes or less where possible, few pans, minimal washing up.' : 'Fun in the kitchen: they have time and want something a bit special, but still realistic at home.'}
 ${b.context ? `Context: ${b.context}` : ''}
-${b.request ? `They've asked for: "${String(b.request).slice(0, 120)}". Every idea must clearly fit this, and "why" should say how it does.` : ''}
+${b.request ? `They've asked for: "${String(b.request).slice(0, 120)}". This comes first, before using things up: every idea, including the "use it up" one, must fully fit it with no swaps or "if you want" notes. "why" says how it fits.` : ''}
+${diet.vegan ? 'STRICTLY VEGAN: no meat, fish, dairy, eggs, honey or any animal product, in any idea or ingredient.' : diet.veggie ? 'STRICTLY VEGETARIAN: no meat or fish (including stock, gelatine, anchovies), in any idea or ingredient.' : ''}
 
 Their stock:
 ${stockLines || '(nothing logged yet)'}
@@ -123,7 +144,7 @@ async function ask(client, prompt, maxTokens, schema) {
       // This model doesn't allow forcing a tool, so offer it and ask for it in the prompt.
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: prompt }],
-    }, { fast: schema === 'cards' });
+    }, { fast: true });
     const used = (msg.content || []).find((b) => b.type === 'tool_use');
     if (used && used.input && typeof used.input === 'object') {
       if (msg.stop_reason === 'max_tokens') throw new Error('Reply cut short (JSON incomplete)');
