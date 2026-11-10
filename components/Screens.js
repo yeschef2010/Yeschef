@@ -164,17 +164,7 @@ export function Home({ mealKey, dateText, stock, tonightPlan, onCookPlan, onOpen
     <div className="screen" style={{ paddingTop: 28 }}>
       <div className="masthead">
         <p className="masthead-date">{dateText}</p>
-        <h1 className="greeting" aria-label={`${meal.greeting}.`}>
-          {`${meal.greeting}.`.split(' ').map((word, w) => (
-            <span key={w} className="mag-word" aria-hidden="true">
-              {magnetWords(word, w * 7).map((m, i) => (
-                <span key={i} className="mag" style={{ color: m.color, transform: `rotate(${m.tilt}deg)` }}>
-                  {m.ch}
-                </span>
-              ))}
-            </span>
-          ))}
-        </h1>
+        <h1 className="greeting">{meal.greeting}!</h1>
       </div>
 
       {banner && (
