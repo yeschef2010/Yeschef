@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { WINE_STYLES, wineStyleOf, AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
+import { useSwipeBack } from './useSwipeBack';
 import ItemGroups from './ItemGroups';
 import { drinksYouCanMake } from '@/lib/drinks';
 import { AISLES, SHOPS, aisleOf, isRunningLow } from '@/lib/shops';
@@ -495,6 +496,7 @@ export function Stepper({ label, value, onChange, min = 0 }) {
 }
 
 export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetry, eaters, onEaters }) {
+  const swipe = useSwipeBack(onBack);
   const [cooking, setCooking] = useState(false);
   // If the recipe doesn't say who it's for (older ones), it was written for whoever was set when it opened.
   const [openedFor] = useState(() => eaters || { adults: 2, kids: 0 });
@@ -513,7 +515,7 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
         };
   const waiting = idea.detail === 'loading' || idea.detail === 'error' || !Array.isArray(idea.steps) || !idea.steps.length;
   return (
-    <div className="screen">
+    <div className="screen" {...swipe}>
       <button className="icon-btn" onClick={onBack} aria-label="Back">
         <Back />
       </button>
