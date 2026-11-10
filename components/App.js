@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
 import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, totalOf } from '@/lib/amounts';
@@ -442,6 +442,28 @@ export default function App() {
   }, []);
 
   const current = screen || (onboarded ? 'home' : 'welcome');
+
+  // Remember how far down each screen was scrolled, so coming back from a recipe lands where you left off.
+  const scrollSpots = useRef({});
+  const currentRef = useRef(current);
+  currentRef.current = current;
+  useEffect(() => {
+    const onScroll = (e) => {
+      const el = e.target;
+      if (el && el.classList && el.classList.contains('screen')) scrollSpots.current[currentRef.current] = el.scrollTop;
+    };
+    document.addEventListener('scroll', onScroll, true);
+    return () => document.removeEventListener('scroll', onScroll, true);
+  }, []);
+  const prevScreen = useRef(current);
+  useLayoutEffect(() => {
+    const from = prevScreen.current;
+    prevScreen.current = current;
+    if (from === current) return;
+    const el = document.querySelector('.app .screen');
+    if (!el) return;
+    el.scrollTop = from === 'recipe' ? scrollSpots.current[current] || 0 : 0;
+  }, [current]);
   const mealKey = mealForHour(now.getHours(), now.getMinutes());
   const ideaKey = `${todayKey(now)}-${mealKey}-${mode}`;
   // Three ideas per meal. Older saved ideas were a single one, so wrap those.
