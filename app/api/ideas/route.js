@@ -1,5 +1,6 @@
 import { guardAi } from '@/lib/guard';
 import { ask as askAi, getClient, MODEL, parseJson, replyText, noKeyResponse, failResponse, withRetry } from '@/lib/ai';
+import { safePrep } from '@/lib/helpers';
 
 export const maxDuration = 60;
 
@@ -19,7 +20,7 @@ const cleanCard = (r, i) => ({
   why: r.why || '',
   missing: Array.isArray(r.missing) ? r.missing : [],
   lights: lightsOf(r),
-  prep: r.prep || '',
+  prep: safePrep(r.prep),
 });
 
 const cleanRecipe = (r) => ({
@@ -232,6 +233,7 @@ How to plan:
 - "missing" lists what to buy for that night (ideally 0 to 2 things).
 - "lights": UK front-of-pack traffic lights per portion (low/medium/high for fat, saturates, sugar, salt).
 - "prep" is one short sentence on anything to do the night before or that morning (soaking, marinating), or "".
+- Food safety for "prep": never tell anyone to leave raw meat, fish, dairy or cooked food out of the fridge overnight or for hours. Defrosting is always freezer to fridge: "Move the chicken thighs from the freezer to the fridge before bed" (or that morning for thin things like mince or fillets). Food already in the fridge needs no prep, so "prep" is "" for it. Bringing meat to room temperature is only ever a 20 to 30 minute step on the day, and belongs in the steps, not in "prep".
 - Return exactly one night per date given, using the same dates.
 
 Give your answer by calling the "answer" tool.`,
@@ -323,7 +325,7 @@ Rules:
 - Anything marked "saved for" another night's planned dinner is off limits: don't use it.
 - Mostly use what they have. "missing" lists at most 2 things to buy, ideally none. Salt, pepper and cooking oil are always available.
 - "lights": UK front-of-pack traffic lights for one portion, each "low", "medium" or "high" (per portion: high is fat over 21g, saturates over 6g, sugar over 15g, salt over 1.8g; low is fat 3g or less, saturates 1.5g or less, sugar 5g or less, salt 0.3g or less).
-- ${tomorrow ? `They're planning ahead late in the evening. "prep" is one short sentence on anything to do tonight to be ready (e.g. "Take the chicken thighs out of the freezer before bed."), or "" if nothing is needed.` : '"prep" is "".'}
+- ${tomorrow ? `They're planning ahead late in the evening. "prep" is one short sentence on anything to do tonight to be ready (e.g. "Move the chicken thighs from the freezer to the fridge before bed."), or "" if nothing is needed. Food safety for "prep": never tell anyone to leave raw meat, fish, dairy or cooked food out of the fridge overnight or for hours. Defrosting is always freezer to fridge: "Move the chicken thighs from the freezer to the fridge before bed" (or that morning for thin things like mince or fillets). Food already in the fridge needs no prep, so "prep" is "" for it. Bringing meat to room temperature is only ever a 20 to 30 minute step on the day, and belongs in the steps, not in "prep".` : '"prep" is "".'}
 
 Give exactly three ideas by calling the "answer" tool (don't write them as text), like this example:
 {"ideas": [{"type": "useup", "title": "Chorizo and chickpea one-pan", "time": "15 mins", "tag": "One pan, hob only", "why": "Uses up your chorizo before it goes off.", "missing": [], "lights": {"fat": "medium", "saturates": "medium", "sugar": "low", "salt": "high"}, "prep": ""}]}`,

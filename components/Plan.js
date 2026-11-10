@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Lights, Stepper } from './Screens';
+import { safePrep } from '@/lib/helpers';
 import { dayLong, eatersText, fromIso } from '@/lib/plan';
 
 const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -72,7 +73,7 @@ function Night({ night, isTonight, busy, onSwap, onToggle, onEaters, onOpen }) {
               {night.defrost.some((d) => d.big) ? 'I’ll remind you the night before.' : 'I’ll remind you that morning.'}
             </p>
           )}
-          {idea.prep && <p className="defrost"><strong>Prep:</strong> {idea.prep}</p>}
+          {safePrep(idea.prep) && <p className="defrost"><strong>Prep:</strong> {safePrep(idea.prep)}</p>}
           {!night.cooked && (
             <div className="row" style={{ gap: 8 }}>
               <button className="btn ghost sm" style={{ flex: 1 }} onClick={() => onSwap(night.date, '')} disabled={busy}>

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { WINE_STYLES, wineStyleOf, AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
+import { WINE_STYLES, wineStyleOf, AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag, safePrep } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import { useSwipeBack } from './useSwipeBack';
 import ItemGroups from './ItemGroups';
@@ -361,9 +361,9 @@ export function Home({ mealKey, dateText, stock, tonightPlan, onCookPlan, onOpen
                     </span>
                     <span className="idea-title">{idea.title}</span>
                     {idea.why && <span className="idea-why">{idea.why}</span>}
-                    {idea.prep && (
+                    {safePrep(idea.prep) && (
                       <span className="idea-prep">
-                        <strong>Tonight:</strong> {idea.prep}
+                        <strong>Tonight:</strong> {safePrep(idea.prep)}
                       </span>
                     )}
                     <span className="idea-foot">
@@ -531,10 +531,10 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
           <Stepper label="Kids" value={who.kids} min={who.adults ? 0 : 1} onChange={(n) => onEaters({ ...who, kids: n })} />
         </div>
       )}
-      {idea.prep && (
+      {safePrep(idea.prep) && (
         <div className="card honey tight">
           <p style={{ fontSize: 15, lineHeight: 1.45 }}>
-            <strong>Tonight:</strong> {idea.prep}
+            <strong>Tonight:</strong> {safePrep(idea.prep)}
           </p>
         </div>
       )}
