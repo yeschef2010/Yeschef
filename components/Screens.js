@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { WINE_STYLES, wineStyleOf, AREA_CATEGORIES, FLAT_AREAS, FOOD_AREAS, MEALS, PRODUCT_AREAS, categoryOf, daysLeft, listJoin, needsAttention, stockTag } from '@/lib/helpers';
 import { Back, Bag, Chevron, Close, Logo, Pin, Tick } from './Icons';
 import ItemGroups from './ItemGroups';
@@ -21,33 +21,78 @@ export function ShopPicker({ value, onChange }) {
   );
 }
 
-export function Welcome({ onTour, onSkip, supermarket, setSupermarket }) {
+export function Welcome({ onTour, onSkip, supermarket, setSupermarket, onJoin, joinPrefill = '' }) {
+  const [joining, setJoining] = useState(!!joinPrefill);
+  const [code, setCode] = useState(joinPrefill);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  // The invite link's code can arrive just after this screen appears.
+  useEffect(() => {
+    if (joinPrefill) {
+      setCode(joinPrefill);
+      setJoining(true);
+    }
+  }, [joinPrefill]);
+  async function join() {
+    setBusy(true);
+    setErr('');
+    try {
+      await onJoin(code);
+    } catch (e) {
+      setErr(e.message || 'That code didn’t work. Check it and try again.');
+    }
+    setBusy(false);
+  }
   return (
-    <div className="screen" style={{ justifyContent: 'space-between', paddingTop: 56 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-        <Logo width={190} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <h1 className="h1">
-            Hi Chef<span className="dot">!</span>
-          </h1>
-          <p className="lead">I'm your kitchen assistant. You cook, I'll handle the admin: what's in, what needs using up, and what to buy.</p>
-          <p className="lead">First, show me what you’ve got. Film, snap, talk or scan a receipt, anywhere in the house, and I’ll sort it all out.</p>
+    <div className="screen welcome" style={{ paddingTop: 44 }}>
+      <div className="welcome-logo">
+        <Logo width={150} />
+      </div>
+      <h1 className="greeting">Hi Chef!</h1>
+      <p className="lead" style={{ marginTop: -6 }}>You cook. I’ll do the admin: what’s in, what needs using up, what’s for dinner and what to buy.</p>
+
+      <div className="idea-card n1 welcome-card">
+        <span className="idea-body">
+          <span className="eyebrow">How it works</span>
+          <span className="welcome-step"><b>1</b> Show me your kitchen once: film it, snap it or just tell me.</span>
+          <span className="welcome-step"><b>2</b> After that, snap your shopping receipts.</span>
+          <span className="welcome-step"><b>3</b> Cook, and I’ll keep track of what’s left.</span>
+        </span>
+      </div>
+
+      {setSupermarket && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p className="h3">Where do you usually shop?</p>
+          <ShopPicker value={supermarket} onChange={setSupermarket} />
         </div>
-        {setSupermarket && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <p className="lbl">Where do you usually shop?</p>
-            <ShopPicker value={supermarket} onChange={setSupermarket} />
-          </div>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <button className="btn" onClick={onTour}>
-          Show me what you’ve got
-        </button>
-        <button className="btn quiet" onClick={onSkip}>
-          Skip for now
-        </button>
-      </div>
+      )}
+
+      <button className="btn" onClick={onTour}>Show me what you’ve got</button>
+
+      {onJoin && (
+        <div className="card welcome-join">
+          {!joining ? (
+            <button className="link-btn" style={{ alignSelf: 'flex-start', fontSize: 16 }} onClick={() => setJoining(true)}>
+              Joining someone’s kitchen? Enter their code
+            </button>
+          ) : (
+            <>
+              <p className="h3">Join a shared kitchen</p>
+              <p className="sub">Got an invite? Enter the code and you’ll see the same kitchen, plans and shopping list.</p>
+              <div className="row">
+                <label htmlFor="welcome-code" className="sr-only">Household code</label>
+                <input id="welcome-code" className="input" placeholder="e.g. ABCD-1234" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} />
+                <button className="btn sm" disabled={busy || code.replace(/[^A-Za-z0-9]/g, '').length < 6} onClick={join}>
+                  {busy ? 'Joining…' : 'Join'}
+                </button>
+              </div>
+              {err && <p className="error">{err}</p>}
+            </>
+          )}
+        </div>
+      )}
+
+      <button className="btn quiet" onClick={onSkip}>Skip for now</button>
     </div>
   );
 }

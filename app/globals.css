@@ -500,3 +500,14 @@ html, body, .app { background: var(--bg); }
 .tonight .idea-title { font-size: 32px !important; }
 
 .tabbar button { font-size: 18px; }
+
+/* Welcome */
+.welcome { gap: 16px; }
+.welcome-logo { align-self: flex-start; background: var(--card); padding: 10px 12px 6px; border-radius: 6px; box-shadow: var(--paper-shadow); transform: rotate(-2deg); }
+.welcome-logo img { display: block; }
+.welcome-card { cursor: default; }
+.welcome-step { display: flex; gap: 10px; align-items: baseline; font-size: 15px; line-height: 28px; }
+.welcome-step b { font-family: var(--hand); font-size: 26px; color: var(--tomato); width: 16px; flex-shrink: 0; }
+.welcome-join { gap: 10px; }
+
+.welcome > * { flex-shrink: 0; }

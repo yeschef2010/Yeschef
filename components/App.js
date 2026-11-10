@@ -191,10 +191,11 @@ export default function App() {
     const j = new URLSearchParams(window.location.search).get('join');
     if (j) {
       setJoinPrefill(j);
-      setScreen('account');
+      // A brand-new phone joins from the welcome screen; an existing one from Account.
+      if (onboarded) setScreen('account');
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [mounted]);
+  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [screen, setScreen] = useState(null);
   const [addMode, setAddMode] = useState('kitchen'); // 'kitchen' | 'products' | 'kit'
@@ -724,6 +725,12 @@ export default function App() {
     <div className="app">
       {current === 'welcome' && (
         <Welcome
+          joinPrefill={joinPrefill}
+          onJoin={async (code) => {
+            await sync.join(code);
+            setOnboarded(true);
+            setScreen('home');
+          }}
           supermarket={profile.supermarket}
           setSupermarket={(id) => setProfile({ ...profile, supermarket: id })}
           onTour={() => startAdd('kitchen')}
