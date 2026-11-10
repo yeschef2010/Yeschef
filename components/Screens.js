@@ -76,6 +76,17 @@ export function DrinksCard({ stock, title = 'Ready to pour' }) {
 }
 
 /* ---------- Main meal screen ---------- */
+// Fridge-magnet letters: each one its own colour and a little tilt (the same every time).
+const MAGNET_COLOURS = ['#EB4933', '#57933C', '#E0922A', '#153D2C'];
+function magnetWords(text, start = 0) {
+  let k = start;
+  return [...text].map((ch) => {
+    if (ch === ' ') return { gap: true };
+    const i = k++;
+    return { ch, color: ch === '.' ? '#EB4933' : ch === ',' ? '#153D2C' : MAGNET_COLOURS[i % 4], tilt: [-4, 3, -2, 4, -3, 2][i % 6] };
+  });
+}
+
 function AskBox({ request, onAsk, busy, meal }) {
   const [text, setText] = useState('');
   const go = () => {
@@ -144,7 +155,7 @@ function StillGot({ items, onCheck, onDone }) {
   );
 }
 
-export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onCheckDone, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, request = '', onAsk, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
+export function Home({ mealKey, dateText, stock, tonightPlan, onCookPlan, onOpenPlan, checkItems = [], onCheck, onCheckDone, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, request = '', onAsk, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
   const meal = MEALS[mealKey];
   const urgent = stock.filter((s) => s.area !== 'Spice rack' && !s.status && stockTag(s).cls === 'red');
   const empty = stock.length === 0;
@@ -153,11 +164,16 @@ export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onChe
     <div className="screen" style={{ paddingTop: 28 }}>
       <div className="masthead">
         <p className="masthead-date">{dateText}</p>
-        <h1 className="greeting">
-          {meal.greeting.replace(/,?\s*Chef$/, '')},
-          <br />
-          <em>Chef</em>
-          <span className="dot">.</span>
+        <h1 className="greeting" aria-label={`${meal.greeting}.`}>
+          {`${meal.greeting}.`.split(' ').map((word, w) => (
+            <span key={w} className="mag-word" aria-hidden="true">
+              {magnetWords(word, w * 7).map((m, i) => (
+                <span key={i} className="mag" style={{ color: m.color, transform: `rotate(${m.tilt}deg)` }}>
+                  {m.ch}
+                </span>
+              ))}
+            </span>
+          ))}
         </h1>
       </div>
 
@@ -192,6 +208,19 @@ export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onChe
           )}
 
           {onCheck && <StillGot items={checkItems} onCheck={onCheck} onDone={onCheckDone} />}
+
+          {mealKey === 'dinner' && tonightPlan && (
+            <div className="tonight">
+              <p className="eyebrow">Tonight’s plan{tonightPlan.idea.time ? ` · ${tonightPlan.idea.time}` : ''}</p>
+              <p className="idea-title" style={{ fontSize: 24 }}>{tonightPlan.idea.title}</p>
+              {tonightPlan.idea.why && <p className="idea-why">{tonightPlan.idea.why}</p>}
+              <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                <button className="btn sm" style={{ flex: 2 }} onClick={onCookPlan}>Let’s cook</button>
+                <button className="btn ghost sm" style={{ flex: 1 }} onClick={onOpenPlan}>Change</button>
+              </div>
+            </div>
+          )}
+          {mealKey === 'dinner' && tonightPlan && <p className="eyebrow" style={{ marginBottom: -6 }}>Or something else tonight</p>}
 
           <div className="seg" role="group" aria-label="How much time have you got?">
             <button aria-pressed={mode === 'quick'} onClick={() => setMode('quick')}>
@@ -368,7 +397,7 @@ function CookedSheet({ idea, stock, onConfirm, onClose }) {
   );
 }
 
-function Stepper({ label, value, onChange, min = 0 }) {
+export function Stepper({ label, value, onChange, min = 0 }) {
   return (
     <div className="stepper">
       <span className="stepper-label">{label}</span>

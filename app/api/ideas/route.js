@@ -60,7 +60,7 @@ function context(b) {
   const stock = (b.stock || []).filter((s) => allowed(s, diet)).slice(0, 200);
   const kit = (b.kit || []).slice(0, 60);
   const stockLines = stock
-    .map((s) => `- ${s.name} (${s.qty || 'some'}; ${s.area}${s.daysLeft != null ? `; use within ${s.daysLeft} day(s)` : ''}${s.status ? `; ${s.status}` : ''})`)
+    .map((s) => `- ${s.name} (${s.qty || 'some'}; ${s.area}${s.daysLeft != null ? `; use within ${s.daysLeft} day(s)` : ''}${s.status ? `; ${s.status}` : ''}${s.saved ? `; saved for ${String(s.saved).slice(0, 40)}` : ''})`)
     .join('\n');
   const text = `Household: ${b.household || 'not set'}
 Dietary needs: ${b.dietary || 'none given'}
@@ -78,7 +78,50 @@ ${kit.map((k) => `- ${k.name}${k.note ? ` (${k.note})` : ''}`).join('\n') || '(n
 }
 
 // The AI fills in a form (a "tool") instead of writing JSON as text, so the reply always comes back in shape.
+const LIGHT_SCHEMA = { type: 'object', properties: Object.fromEntries(['fat', 'saturates', 'sugar', 'salt'].map((k) => [k, { type: 'string', enum: ['low', 'medium', 'high'] }])) };
+
 const SCHEMAS = {
+  week: {
+    type: 'object',
+    properties: {
+      nights: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            date: { type: 'string', description: 'The night, exactly as given (YYYY-MM-DD)' },
+            title: { type: 'string' },
+            time: { type: 'string' },
+            tag: { type: 'string' },
+            why: { type: 'string' },
+            missing: { type: 'array', items: { type: 'string' } },
+            lights: LIGHT_SCHEMA,
+            prep: { type: 'string' },
+          },
+          required: ['date', 'title', 'time', 'why'],
+        },
+      },
+    },
+    required: ['nights'],
+  },
+  packs: {
+    type: 'object',
+    properties: {
+      items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'What to buy, plain words' },
+            buy: { type: 'string', description: 'The pack(s) to buy, e.g. "1 x 600g tub"' },
+            why: { type: 'string', description: 'Which nights it covers and any saving, e.g. "Covers Tue and Thu, cheaper than two 300g pots"' },
+          },
+          required: ['name', 'buy'],
+        },
+      },
+    },
+    required: ['items'],
+  },
   cards: {
     type: 'object',
     properties: {
@@ -162,6 +205,71 @@ export async function POST(req) {
     const b = await req.json();
     const { tomorrow, meal, mode, text } = context(b);
 
+    // Plan the week: one dinner per night, joined up so nothing half-used is wasted.
+    if (b.step === 'week') {
+      const nights = (Array.isArray(b.nights) ? b.nights : []).slice(0, 7);
+      if (!nights.length) return Response.json({ nights: [] });
+      const keep = (Array.isArray(b.keep) ? b.keep : []).slice(0, 7);
+      const r = await ask(
+        client,
+        `Plan weeknight dinners for a busy UK family, one per night, using what they already have.
+
+Nights to plan (date, day, who's eating, anything asked for):
+${nights.map((n) => `- ${n.date} (${n.day}): ${n.eaters || 'the household'}${n.request ? `; they asked for "${String(n.request).slice(0, 100)}"` : ''}`).join('\n')}
+${keep.length ? `\nAlready planned, keep these and plan around them:\n${keep.map((k) => `- ${k.day}: ${k.title}`).join('\n')}` : ''}
+
+${text}
+
+How to plan:
+- Use what needs eating soonest on the earliest nights.
+- Join the week up: if one meal uses half a bunch of coriander, half a tub of yoghurt or half a bag of spinach, use the rest on another night. Planned leftovers are good (e.g. roast chicken on Monday, chicken wraps on Wednesday); say so in "why".
+- Vary it across the week: different main proteins and cuisines, nothing twice.
+- A night's request comes first for that night.
+- Weeknights, so mostly 30 minutes or less; one slightly bigger one is fine.
+- "missing" lists what to buy for that night (ideally 0 to 2 things).
+- "lights": UK front-of-pack traffic lights per portion (low/medium/high for fat, saturates, sugar, salt).
+- "prep" is one short sentence on anything to do the night before or that morning (soaking, marinating), or "".
+- Return exactly one night per date given, using the same dates.
+
+Give your answer by calling the "answer" tool.`,
+        5000,
+        'week'
+      );
+      const byDate = new Map((Array.isArray(r.nights) ? r.nights : []).filter((n) => n && n.title).map((n) => [String(n.date), n]));
+      const out = nights.map((n, i) => {
+        const x = byDate.get(String(n.date)) || (Array.isArray(r.nights) ? r.nights[i] : null);
+        return x ? { date: n.date, ...cleanCard(x, 0), type: 'plan' } : null;
+      });
+      return Response.json({ nights: out });
+    }
+
+    // Pack sizes: turn the week's shopping needs into sensible packs to buy.
+    if (b.step === 'packs') {
+      const needs = (Array.isArray(b.needs) ? b.needs : []).slice(0, 60);
+      if (!needs.length) return Response.json({ items: [] });
+      const r = await ask(
+        client,
+        `Here's everything a UK family needs to buy for this week's dinners, with which nights need it:
+${needs.map((n) => `- ${n.name}: ${n.amount || 'some'} (${(n.nights || []).join(', ')})`).join('\n')}
+
+Turn this into a shopping list of real UK supermarket packs:
+- Combine the same thing across nights into one line (e.g. 150g and 200g of Greek yoghurt → "1 x 500g tub").
+- Pick the pack size that covers everything with least waste, and prefer one bigger pack over two small ones when it's usually better value; say so in "why".
+- "buy" is the packs, e.g. "1 x 500g tub", "2 x 400g tins", "1 bunch".
+- "why" says which nights it covers, e.g. "Tue and Thu".
+- Don't add anything that isn't in the list.
+
+Give your answer by calling the "answer" tool.`,
+        2500,
+        'packs'
+      );
+      const items = (Array.isArray(r.items) ? r.items : [])
+        .filter((x) => x && x.name)
+        .slice(0, 60)
+        .map((x) => ({ name: String(x.name).slice(0, 60), buy: String(x.buy || '').slice(0, 40), why: String(x.why || '').slice(0, 100) }));
+      return Response.json({ items });
+    }
+
     if (b.step === 'recipe') {
       const idea = b.idea || {};
       const r = await ask(
@@ -209,6 +317,7 @@ ${avoid.length ? `Don't suggest any of these again: ${avoid.join('; ')}.` : ''}
 
 Rules:
 - "why" is one short sentence on why it suits them, e.g. what it uses up.
+- Anything marked "saved for" another night's planned dinner is off limits: don't use it.
 - Mostly use what they have. "missing" lists at most 2 things to buy, ideally none. Salt, pepper and cooking oil are always available.
 - "lights": UK front-of-pack traffic lights for one portion, each "low", "medium" or "high" (per portion: high is fat over 21g, saturates over 6g, sugar over 15g, salt over 1.8g; low is fat 3g or less, saturates 1.5g or less, sugar 5g or less, salt 0.3g or less).
 - ${tomorrow ? `They're planning ahead late in the evening. "prep" is one short sentence on anything to do tonight to be ready (e.g. "Take the chicken thighs out of the freezer before bed."), or "" if nothing is needed.` : '"prep" is "".'}

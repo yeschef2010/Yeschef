@@ -32,6 +32,9 @@ export const Fridge = () => (
 export const Spray = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" {...S}><path d="M8 9 H15 L16 21 H7 Z" /><path d="M9 9 V6 H13 L16 4 M13 6 L15 7.5" /><path d="M19 4 H19.01 M20 7 H20.01" /></svg>
 );
+export const Calendar = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" {...S}><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10 H20.5 M8 3 V7 M16 3 V7" /></svg>
+);
 export const Basket = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" {...S}><path d="M4 9 H20 L18 20 H6 Z" /><path d="M9 9 L12 4 L15 9" /></svg>
 );

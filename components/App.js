@@ -9,7 +9,9 @@ import { parseHousehold } from '@/lib/servings';
 import { checkList, estimate, withEstimates } from '@/lib/drift';
 import { aisleOf, matchesListItem, shopById } from '@/lib/shops';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
-import { Basket, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
+import { Basket, Calendar, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
+import Plan from './Plan';
+import { dayLong, dayShort, defrostFor, eatersText, isoDate, savedFor, weekNeeds, weeknights } from '@/lib/plan';
 
 const FRIENDLY_FAIL = 'Sorry Chef, I couldn’t reach the kitchen brain. Check your signal and try again.';
 
@@ -120,6 +122,7 @@ export default function App() {
   const [settings, setSettings] = usePersistentState('yc.settings', { useUp: true, autoIdea: true });
   const [shopList, setShopList] = usePersistentState('yc.shop', []);
   const [waste, setWaste] = usePersistentState('yc.waste', []);
+  const [plan, setPlan] = usePersistentState('yc.plan', []);
   const [lastCheck, setLastCheck] = usePersistentState('yc.lastCheck', 0);
   const shopRef = useRef(shopList);
   shopRef.current = shopList;
@@ -157,7 +160,7 @@ export default function App() {
     code: household,
     setCode: setHousehold,
     mounted,
-    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList], products: [products, setProducts], waste: [waste, setWaste] },
+    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList], products: [products, setProducts], waste: [waste, setWaste], plan: [plan, setPlan] },
     profile,
     setProfile,
   });
@@ -203,6 +206,8 @@ export default function App() {
   const [ideaError, setIdeaError] = useState('');
   const [banner, setBanner] = useState('');
   const [now, setNow] = useState(() => new Date());
+  const stockRef = useRef(stock);
+  stockRef.current = stock;
   const eatersRef = useRef(eaters);
   eatersRef.current = eaters;
   // The kitchen as it probably is now: everyday things (milk, bread, fruit) run down between counts.
@@ -221,6 +226,169 @@ export default function App() {
       setStock((l) => l.map((x) => (x.id === id ? { ...x, countedAt: Date.now(), status: answer === 'low' ? 'Low' : null } : x)));
       if (answer === 'low') addToList([{ name: item.name, area: item.area, category: item.category, why: 'Running low' }], 'Running low', { quiet: true });
     }
+  }
+
+  /* ----- Reminders (phone notifications) ----- */
+  const [notifyState, setNotifyState] = useState('off');
+  const pushSupported = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+  // Register the service worker and see whether this phone already gets reminders.
+  useEffect(() => {
+    if (!mounted || !pushSupported()) {
+      if (mounted) setNotifyState('unsupported');
+      return;
+    }
+    if (Notification.permission === 'denied') setNotifyState('blocked');
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => reg.pushManager.getSubscription())
+      .then((sub) => {
+        if (sub && Notification.permission === 'granted') {
+          setNotifyState('on');
+          // Keep the household's copy up to date (e.g. after joining a household).
+          if (household) postJson('/api/push', { code: household, subscription: sub.toJSON() }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [mounted, household]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function enableNotifications() {
+    if (!pushSupported()) return setNotifyState('unsupported');
+    if (!household) return;
+    setNotifyState('working');
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return setNotifyState(permission === 'denied' ? 'blocked' : 'off');
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const { publicKey } = await fetch('/api/push').then((r) => r.json());
+      const raw = atob(publicKey.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (publicKey.length % 4)) % 4));
+      const applicationServerKey = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey }));
+      await postJson('/api/push', { code: household, subscription: sub.toJSON() });
+      setNotifyState('on');
+    } catch (e) {
+      setNotifyState('off');
+      setPlanError(`Couldn’t turn reminders on. ${e.message || ''}`.trim());
+    }
+  }
+
+  // Tapping a reminder opens the right page (?go=plan).
+  useEffect(() => {
+    if (!mounted) return;
+    const go = new URLSearchParams(window.location.search).get('go');
+    if (go && ['home', 'plan', 'kitchen', 'shop'].includes(go)) {
+      setScreen(go);
+      window.history.replaceState(null, '', '/');
+    }
+  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ----- Plan the week ----- */
+  const todayIso = isoDate(now);
+  const planDates = useMemo(() => weeknights(now), [now.getDate(), now.getHours() >= 20]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [planBusy, setPlanBusy] = useState({});
+  const [planning, setPlanning] = useState(false);
+  const [planError, setPlanError] = useState('');
+  const [planShop, setPlanShop] = useState('');
+  const [recipeFrom, setRecipeFrom] = useState(null);
+  const defaultEaters = eaters || { adults: 2, kids: 0 };
+  const nights = planDates.map((d) => {
+    const saved = plan.find((n) => n.date === d);
+    const base = saved || { id: d, date: d, eaters: defaultEaters, off: false };
+    return { ...base, eaters: base.eaters || defaultEaters, loading: planBusy[d] === 'loading', error: planBusy[d] === 'error' };
+  });
+  const tonightPlan = nights.find((n) => n.date === todayIso && n.idea && !n.off && !n.cooked) || null;
+
+  function upsertNight(date, patch) {
+    setPlan((list) => {
+      const cutoff = isoDate(new Date(Date.now() - 14 * 86400000));
+      const kept = list.filter((n) => n.date >= cutoff);
+      const i = kept.findIndex((n) => n.date === date);
+      const prev = i >= 0 ? kept[i] : { id: date, date, eaters: defaultEaters, off: false };
+      const next = { ...prev, ...(typeof patch === 'function' ? patch(prev) : patch) };
+      return i >= 0 ? kept.map((n, j) => (j === i ? next : n)) : [...kept, next];
+    });
+  }
+
+  // Write out one planned night's full recipe, and work out what it needs from the freezer.
+  function loadPlanRecipe(date, card, who) {
+    const base = { ...ideaBase(), eaters: who, household: eatersText(who), meal: 'dinner' };
+    upsertNight(date, (n) => ({ idea: { ...(n.idea || card), detail: 'loading' } }));
+    postJson('/api/ideas', { ...base, step: 'recipe', idea: { title: card.title, why: card.why, time: card.time } })
+      .then((r) =>
+        upsertNight(date, (n) =>
+          n.idea && n.idea.title === card.title
+            ? { idea: { ...n.idea, ...r, serves: r.serves || who, missing: r.missing && r.missing.length ? r.missing : card.missing, detail: 'ready' }, defrost: defrostFor(r, stockRef.current) }
+            : {}
+        )
+      )
+      .catch(() => upsertNight(date, (n) => (n.idea && n.idea.title === card.title ? { idea: { ...n.idea, detail: 'error' } } : {})));
+  }
+
+  // Plan some or all of the week's nights in one go, keeping the others as they are.
+  async function planWeek(onlyDates, requests = {}) {
+    const targets = (onlyDates || planDates).filter((d) => !(nights.find((n) => n.date === d) || {}).off);
+    if (!targets.length) return;
+    if (!onlyDates) setPlanning(true);
+    setPlanError('');
+    setPlanBusy((b) => ({ ...b, ...Object.fromEntries(targets.map((d) => [d, 'loading'])) }));
+    const keep = nights.filter((n) => !targets.includes(n.date) && n.idea && !n.off).map((n) => ({ day: dayLong(n.date), title: n.idea.title }));
+    try {
+      const data = await postJson('/api/ideas', {
+        ...ideaBase(),
+        step: 'week',
+        nights: targets.map((d) => {
+          const n = nights.find((x) => x.date === d);
+          return { date: d, day: dayLong(d), eaters: eatersText(n.eaters), request: requests[d] || '' };
+        }),
+        keep,
+      });
+      (data.nights || []).forEach((card) => {
+        if (!card) return;
+        const n = nights.find((x) => x.date === card.date);
+        upsertNight(card.date, { idea: { ...card, detail: 'loading' }, request: requests[card.date] || '', cooked: false, defrost: [] });
+        loadPlanRecipe(card.date, card, (n && n.eaters) || defaultEaters);
+      });
+      const failed = targets.filter((d) => !(data.nights || []).some((c) => c && c.date === d));
+      setPlanBusy((b) => ({ ...b, ...Object.fromEntries(targets.map((d) => [d, failed.includes(d) ? 'error' : ''])) }));
+      setPlanShop('');
+    } catch (e) {
+      setPlanBusy((b) => ({ ...b, ...Object.fromEntries(targets.map((d) => [d, onlyDates ? 'error' : ''])) }));
+      setPlanError(`${e.message || FRIENDLY_FAIL}${e.detail ? `\nDetails: ${e.detail}` : ''}`);
+    }
+    setPlanning(false);
+  }
+
+  // Everything the week needs that isn't in the kitchen, in sensible packs, onto the shopping list.
+  async function shopForWeek() {
+    const needs = weekNeeds(nights.filter((n) => !n.off), stock);
+    if (!needs.length) {
+      setPlanShop('done');
+      setBanner('You’ve already got everything for the week.');
+      return;
+    }
+    setPlanShop('loading');
+    try {
+      const r = await postJson('/api/ideas', { ...ideaBase(), step: 'packs', needs: needs.map((n) => ({ name: n.name, amount: n.amount, nights: n.nights })) });
+      const items = (r.items && r.items.length ? r.items : needs.map((n) => ({ name: n.name, buy: n.amount, why: n.nights.join(', ') })));
+      addToList(
+        items.map((i) => {
+          const hint = needs.find((n) => n.name.toLowerCase() === i.name.toLowerCase()) || {};
+          return { name: i.name, qty: i.buy, why: i.why || 'For the week', area: hint.area, category: hint.category };
+        }),
+        'For the week',
+        { quiet: true }
+      );
+      setPlanShop('done');
+    } catch (e) {
+      setPlanShop('error');
+    }
+  }
+
+  function openPlanRecipe(date) {
+    setRecipeFrom({ plan: date });
+    setBanner('');
+    setScreen('recipe');
   }
 
   // Used up or binned from the edit sheet. Binned things go in the waste tally.
@@ -385,7 +553,8 @@ export default function App() {
   /* ----- Meal ideas ----- */
   // What the AI needs to know for any idea or recipe right now.
   const ideaBase = useCallback(() => {
-    const stockForAi = stockView.map((s) => ({ name: s.name, qty: ((t) => (t ? `${s.qty}; ${t.n} ${t.unit === 'each' ? t.word || 'each' : t.unit} in total` : s.qty))(totalOf(s)), area: s.area, daysLeft: daysLeft(s), status: s.status }));
+    const saved = savedFor(plan, isoDate(now));
+    const stockForAi = stockView.map((s) => ({ saved: saved.get(s.name.toLowerCase()) || undefined, name: s.name, qty: ((t) => (t ? `${s.qty}; ${t.n} ${t.unit === 'each' ? t.word || 'each' : t.unit} in total` : s.qty))(totalOf(s)), area: s.area, daysLeft: daysLeft(s), status: s.status }));
     const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
     const weekend = now.getDay() === 0 || now.getDay() === 6;
     return {
@@ -400,7 +569,7 @@ export default function App() {
       dietary: profile.dietary,
       context: `It's ${day}${weekend ? ' (weekend)' : ''}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.`,
     };
-  }, [stockView, kit, profile, mealKey, mode, now]);
+  }, [stockView, kit, profile, mealKey, mode, now, plan]);
 
   // Fill in one idea's full recipe (ingredients, steps) in the background.
   const loadRecipe = useCallback((key, i, card, base) => {
@@ -441,7 +610,7 @@ export default function App() {
 
   useEffect(() => {
     if (!mounted || current !== 'home' || !settings.autoIdea) return;
-    if (stock.length === 0 || idea || ideaState !== 'idle' || autoTried.current[ideaKey]) return;
+    if (stock.length === 0 || idea || ideaState !== 'idle' || autoTried.current[ideaKey] || (mealKey === 'dinner' && tonightPlan)) return;
     autoTried.current[ideaKey] = true;
     getIdea(false);
   }, [mounted, current, settings.autoIdea, stock.length, idea, ideaState, ideaKey, getIdea]);
@@ -541,9 +710,9 @@ export default function App() {
 
   if (!mounted) return <div className="app" />;
 
-  const tabs = ['home', 'kitchen', 'products', 'shop', 'kit', 'account', 'settings', 'about'];
+  const tabs = ['home', 'plan', 'kitchen', 'products', 'shop', 'kit', 'account', 'settings', 'about'];
   const showTabs = tabs.includes(current);
-  const showMenu = ['home', 'kitchen', 'products', 'shop'].includes(current);
+  const showMenu = ['home', 'plan', 'kitchen', 'products', 'shop'].includes(current);
   const go = (s) => () => {
     setBanner('');
     setBannerAction(null);
@@ -591,6 +760,9 @@ export default function App() {
           mealKey={mealKey}
           dateText={dateLine(now)}
           stock={stockView}
+          tonightPlan={tonightPlan}
+          onCookPlan={() => tonightPlan && openPlanRecipe(tonightPlan.date)}
+          onOpenPlan={go('plan')}
           checkItems={checkItems}
           onCheck={answerCheck}
           onCheckDone={() => setLastCheck(Date.now())}
@@ -607,6 +779,7 @@ export default function App() {
           request={(ideaSet && ideaSet.request) || ''}
           onAsk={(text) => getIdea(false, text)}
           onCook={(i) => {
+            setRecipeFrom(null);
             setIdeaIdx(i);
             setBanner('');
             setScreen('recipe');
@@ -623,7 +796,46 @@ export default function App() {
         />
       )}
 
-      {current === 'recipe' && <Recipe idea={idea} stock={stock} eaters={eaters} onEaters={(e) => setProfile((p) => ({ ...p, adults: e.adults, kids: e.kids }))} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, { ...ideaBase(), request: (ideaSet && ideaSet.request) || '' })} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
+      {current === 'recipe' && recipeFrom && recipeFrom.plan && (() => {
+        const night = nights.find((n) => n.date === recipeFrom.plan);
+        if (!night || !night.idea) return null;
+        return (
+          <Recipe
+            key={night.date + night.idea.title}
+            idea={night.idea}
+            stock={stock}
+            eaters={night.eaters}
+            onEaters={(e) => upsertNight(night.date, { eaters: e })}
+            onRetry={() => loadPlanRecipe(night.date, night.idea, night.eaters)}
+            onBack={() => { setRecipeFrom(null); setScreen(night.date === todayIso ? 'home' : 'plan'); }}
+            onCooked={(changes) => {
+              cooked(changes);
+              upsertNight(night.date, { cooked: true });
+              setRecipeFrom(null);
+            }}
+            onAddToList={(n) => addToList(n, `For ${dayShort(night.date)}`, { findOptions: true })}
+          />
+        );
+      })()}
+      {current === 'recipe' && !(recipeFrom && recipeFrom.plan) && <Recipe idea={idea} stock={stock} eaters={eaters} onEaters={(e) => setProfile((p) => ({ ...p, adults: e.adults, kids: e.kids }))} onRetry={() => loadRecipe(ideaKey, ideaList.indexOf(idea), idea, { ...ideaBase(), request: (ideaSet && ideaSet.request) || '' })} onBack={go('home')} onCooked={cooked} onAddToList={(n) => addToList(n, 'For a recipe', { findOptions: true })} />}
+      {current === 'plan' && (
+        <Plan
+          nights={nights}
+          todayIso={todayIso}
+          planning={planning}
+          error={planError}
+          onPlanAll={() => planWeek(null)}
+          onSwap={(date, request) => planWeek([date], { [date]: request })}
+          onToggle={(date) => upsertNight(date, (n) => ({ off: !n.off }))}
+          onEaters={(date, e) => upsertNight(date, { eaters: e })}
+          onOpen={openPlanRecipe}
+          onShop={shopForWeek}
+          shopState={planShop}
+          notify={notifyState}
+          onNotify={enableNotifications}
+          household={household}
+        />
+      )}
 
       {current === 'kitchen' && (
         <Kitchen
@@ -751,6 +963,10 @@ export default function App() {
           <button aria-current={current === 'home' ? 'page' : undefined} onClick={go('home')}>
             <Plate />
             {mealName.tab}
+          </button>
+          <button aria-current={current === 'plan' ? 'page' : undefined} onClick={go('plan')}>
+            <Calendar />
+            Plan
           </button>
           <button aria-current={current === 'kitchen' ? 'page' : undefined} onClick={go('kitchen')}>
             <Fridge />
