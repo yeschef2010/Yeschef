@@ -110,7 +110,41 @@ function AskBox({ request, onAsk, busy, meal }) {
   );
 }
 
-export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, request = '', onAsk, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
+function StillGot({ items, onCheck, onDone }) {
+  const [answered, setAnswered] = useState({});
+  const left = items.filter((i) => !answered[i.id]);
+  if (!items.length) return null;
+  const answer = (id, a) => {
+    onCheck(id, a);
+    const next = { ...answered, [id]: a };
+    setAnswered(next);
+    if (items.every((i) => next[i.id])) onDone();
+  };
+  return (
+    <div className="card tight still-got">
+      <div className="row between">
+        <p className="eyebrow">Quick check · still got these?</p>
+        <button className="link-btn small" onClick={onDone}>Later</button>
+      </div>
+      {left.length === 0 && <p className="sub">Thanks, Chef. Kitchen’s up to date.</p>}
+      {left.map((i) => (
+        <div key={i.id} className="still-row">
+          <div className="still-text">
+            <span className="shop-name">{i.name}</span>
+            <span className="shop-why">{i.qty === 'Probably gone' ? 'Probably gone by now' : `${i.qty} left, I think`}</span>
+          </div>
+          <div className="still-btns">
+            <button onClick={() => answer(i.id, 'plenty')}>Plenty</button>
+            <button onClick={() => answer(i.id, 'low')}>Low</button>
+            <button className="gone" onClick={() => answer(i.id, 'gone')}>Gone</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Home({ mealKey, dateText, stock, checkItems = [], onCheck, onCheckDone, ideas = [], ideaState, ideaError, mode, setMode, onGetIdea, onAnother, request = '', onAsk, onCook, onAddToList, onTour, banner, bannerAction, onBannerAction, showUseUp }) {
   const meal = MEALS[mealKey];
   const urgent = stock.filter((s) => s.area !== 'Spice rack' && !s.status && stockTag(s).cls === 'red');
   const empty = stock.length === 0;
@@ -156,6 +190,8 @@ export function Home({ mealKey, dateText, stock, ideas = [], ideaState, ideaErro
               </p>
             </div>
           )}
+
+          {onCheck && <StillGot items={checkItems} onCheck={onCheck} onDone={onCheckDone} />}
 
           <div className="seg" role="group" aria-label="How much time have you got?">
             <button aria-pressed={mode === 'quick'} onClick={() => setMode('quick')}>
@@ -456,9 +492,9 @@ export function Recipe({ idea, stock = [], onBack, onCooked, onAddToList, onRetr
 }
 
 /* ---------- Edit sheet ---------- */
-export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, onClose }) {
+export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, onFinish, onClose }) {
   const [name, setName] = useState(item.name);
-  const [qty, setQty] = useState(isKit ? item.note || '' : item.qty || '');
+  const [qty, setQty] = useState(isKit ? item.note || '' : String(item.qty || '').replace(/^≈\s*/, ''));
   const [area, setArea] = useState(item.area || 'Fridge');
   const [status, setStatus] = useState(item.status || '');
   const [category, setCategory] = useState(() => categoryOf({ ...item, area: isKit ? 'Equipment' : item.area }));
@@ -542,21 +578,39 @@ export function EditSheet({ item, isKit, isProduct = false, onSave, onRemove, on
             </select>
           </>
         )}
-        <div className="row">
-          <button className="btn ghost" style={{ flex: 1 }} onClick={() => onRemove(item.id)}>
-            {isKit ? 'Remove' : isProduct ? 'Remove' : 'Used it up'}
-          </button>
-          <button className="btn" style={{ flex: 1 }} onClick={save}>
-            Save
-          </button>
-        </div>
+        {onFinish ? (
+          <>
+            <div className="row">
+              <button className="btn ghost" style={{ flex: 1 }} onClick={() => onFinish('used')}>
+                Used it up
+              </button>
+              {!isProduct && (
+                <button className="btn ghost bin" style={{ flex: 1 }} onClick={() => onFinish('binned')}>
+                  Binned it
+                </button>
+              )}
+            </div>
+            <button className="btn" onClick={save}>
+              Save
+            </button>
+          </>
+        ) : (
+          <div className="row">
+            <button className="btn ghost" style={{ flex: 1 }} onClick={() => onRemove(item.id)}>
+              Remove
+            </button>
+            <button className="btn" style={{ flex: 1 }} onClick={save}>
+              Save
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 /* ---------- Kitchen ---------- */
-export function Kitchen({ stock, onEdit, onDelete, undo, onUndo, onAdd, onUpdateArea, products = false, banner }) {
+export function Kitchen({ stock, onEdit, onDelete, undo, onUndo, onAdd, onUpdateArea, products = false, banner, binned = 0 }) {
   const areas = products ? PRODUCT_AREAS : FOOD_AREAS;
   const [open, setOpen] = useState({ [areas[0]]: true });
   const [openCats, setOpenCats] = useState({});
@@ -566,7 +620,10 @@ export function Kitchen({ stock, onEdit, onDelete, undo, onUndo, onAdd, onUpdate
     <div className="screen" style={{ paddingTop: 28 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 56 }}>
         <h2 className="h2" style={{ fontSize: 32 }}>{products ? 'Household products' : 'Your kitchen'}</h2>
-        <p className="sub">{stock.length} things logged. Tap one to change it.</p>
+        <p className="sub">
+          {stock.length} things logged.{binned > 0 ? ` ${binned} binned this month.` : ''}
+          {stock.some((s) => s.estimated) ? ' ≈ means my best guess of what’s left.' : ''}
+        </p>
       </div>
       {banner && (
         <div className="card green tight">

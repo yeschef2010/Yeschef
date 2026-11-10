@@ -1,11 +1,12 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePersistentState, clearAllSaved, newId } from '@/lib/store';
 import { useHouseholdSync } from '@/lib/sync';
 import { normAmount, parseQty, formatAmount, addAmounts, findSame, takeFrom, totalOf } from '@/lib/amounts';
 import { FOOD_AREAS, MEALS, PRODUCT_AREAS, kindOfArea, dateLine, daysLeft, locationKey, mealForHour, migrateArea, qtyFromLocations, todayKey } from '@/lib/helpers';
 import AddItems from './Tour';
 import { parseHousehold } from '@/lib/servings';
+import { checkList, estimate, withEstimates } from '@/lib/drift';
 import { aisleOf, matchesListItem, shopById } from '@/lib/shops';
 import { About, Account, EditSheet, Home, Kit, Kitchen, Recipe, Settings, Shop, Welcome } from './Screens';
 import { Basket, Spray, Fridge, Info, MenuIcon, Pan, Person, Plate, Sliders } from './Icons';
@@ -66,20 +67,24 @@ function normaliseFood(it, fallbackArea, where) {
 }
 
 // Put one found item into a list: update the same thing if it's already there, otherwise add it.
-function mergeItem(next, f) {
+function mergeItem(next, f, eaters) {
   const { kind, job, seenIn, check, source, amount, pack, ...item } = f;
   const key = locationKey(seenIn, item.area);
   const here = amount || item.qty;
   const i = findSame(next, item);
   if (i < 0) {
     const locations = { [key]: here };
-    next.push({ ...item, pack: pack || null, locations, qty: qtyFromLocations(locations) });
+    next.push({ ...item, pack: pack || null, locations, qty: qtyFromLocations(locations), countedAt: Date.now() });
     return;
   }
   const prev = next[i];
   const locations = { ...(prev.locations || { main: prev.qty }) };
   if (source === 'receipt') {
-    // New shopping adds to what's already in. If the old amount was just words ("half a bag"), keep both.
+    // New shopping adds to what's already in (what's probably left of everyday things, not what was counted days ago).
+    // If the old amount was just words ("half a bag"), keep both.
+    const est = estimate(prev, eaters);
+    if (est && key === 'main' && Object.keys(locations).length <= 1) locations.main = est.amount.n > 0 ? est.amount : undefined;
+    if (locations.main === undefined) delete locations.main;
     const old = locations[key];
     const sum = old == null ? parseQty(here) : addAmounts(old, here);
     locations[key] = sum || (old ? `${typeof here === 'object' ? formatAmount(here) : here} + ${typeof old === 'object' ? formatAmount(old) : old}` : here);
@@ -101,6 +106,7 @@ function mergeItem(next, f) {
     pack: pack || prev.pack || null,
     locations,
     qty: qtyFromLocations(locations),
+    countedAt: Date.now(),
   };
 }
 
@@ -113,13 +119,17 @@ export default function App() {
   const [profile, setProfile] = usePersistentState('yc.profile', { name: '', household: '', dietary: '' });
   const [settings, setSettings] = usePersistentState('yc.settings', { useUp: true, autoIdea: true });
   const [shopList, setShopList] = usePersistentState('yc.shop', []);
+  const [waste, setWaste] = usePersistentState('yc.waste', []);
+  const [lastCheck, setLastCheck] = usePersistentState('yc.lastCheck', 0);
   const shopRef = useRef(shopList);
   shopRef.current = shopList;
   const [bannerAction, setBannerAction] = useState(null);
   // The last thing swiped away, so it can come back.
   const [undo, setUndo] = useState(null);
   const undoTimer = useRef(null);
-  function swipeDelete(item, isProduct) {
+  function swipeDelete(shown, isProduct) {
+    // The Kitchen shows estimates; keep the real record so Undo puts back exactly what was there.
+    const item = (isProduct ? products : stock).find((x) => x.id === shown.id) || shown;
     const set = isProduct ? setProducts : setStock;
     set((list) => list.filter((x) => x.id !== item.id));
     setUndo({ ...item, isProduct });
@@ -147,7 +157,7 @@ export default function App() {
     code: household,
     setCode: setHousehold,
     mounted,
-    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList], products: [products, setProducts] },
+    collections: { stock: [stock, setStock], kit: [kit, setKit], shop: [shopList, setShopList], products: [products, setProducts], waste: [waste, setWaste] },
     profile,
     setProfile,
   });
@@ -193,6 +203,34 @@ export default function App() {
   const [ideaError, setIdeaError] = useState('');
   const [banner, setBanner] = useState('');
   const [now, setNow] = useState(() => new Date());
+  const eatersRef = useRef(eaters);
+  eatersRef.current = eaters;
+  // The kitchen as it probably is now: everyday things (milk, bread, fruit) run down between counts.
+  const stockView = useMemo(() => withEstimates(stock, eaters, now.getTime()), [stock, eaters, now]);
+  const checkItems = useMemo(() => (now.getTime() - (lastCheck || 0) > 3 * 86400000 ? checkList(stockView) : []), [stockView, lastCheck, now]);
+  const binnedThisMonth = waste.filter((w) => new Date(w.at).getMonth() === now.getMonth() && new Date(w.at).getFullYear() === now.getFullYear()).length;
+
+  // "Still got these?" answers.
+  function answerCheck(id, answer) {
+    const item = stock.find((x) => x.id === id);
+    if (!item) return;
+    if (answer === 'gone') {
+      setStock((l) => l.filter((x) => x.id !== id));
+      addToList([{ name: item.name, area: item.area, category: item.category, why: 'Ran out' }], 'Ran out', { quiet: true });
+    } else {
+      setStock((l) => l.map((x) => (x.id === id ? { ...x, countedAt: Date.now(), status: answer === 'low' ? 'Low' : null } : x)));
+      if (answer === 'low') addToList([{ name: item.name, area: item.area, category: item.category, why: 'Running low' }], 'Running low', { quiet: true });
+    }
+  }
+
+  // Used up or binned from the edit sheet. Binned things go in the waste tally.
+  function finishItem(item, how, isProduct) {
+    (isProduct ? setProducts : setStock)((l) => l.filter((x) => x.id !== item.id));
+    if (how === 'binned') setWaste((w) => [...w, { id: newId(), name: item.name, qty: item.qty || '', area: item.area, at: Date.now() }].slice(-500));
+    const already = shopRef.current.some((l) => !l.done && matchesListItem(l, item.name));
+    setBanner(how === 'binned' ? `Binned ${item.name.toLowerCase()}. That’s ${binnedThisMonth + 1} thing${binnedThisMonth ? 's' : ''} binned this month.` : `Used up ${item.name.toLowerCase()}.`);
+    setBannerAction(already ? null : { label: `Add ${item.name.toLowerCase()} to the shopping list`, run: () => addToList([{ name: item.name, area: item.area, category: item.category, why: how === 'binned' ? 'Binned it' : 'Used it up' }]) });
+  }
   const autoTried = useRef({});
 
   useEffect(() => {
@@ -217,14 +255,14 @@ export default function App() {
     if (productItems.length) {
       setProducts((ps) => {
         const next = [...ps];
-        productItems.forEach((f) => mergeItem(next, { ...f, seenIn: null }));
+        productItems.forEach((f) => mergeItem(next, { ...f, seenIn: null }, eatersRef.current));
         return next;
       });
     }
     if (food.length) {
       setStock((s) => {
         const next = [...s];
-        food.forEach((f) => mergeItem(next, f));
+        food.forEach((f) => mergeItem(next, f, eatersRef.current));
         return next;
       });
     }
@@ -347,7 +385,7 @@ export default function App() {
   /* ----- Meal ideas ----- */
   // What the AI needs to know for any idea or recipe right now.
   const ideaBase = useCallback(() => {
-    const stockForAi = stock.map((s) => ({ name: s.name, qty: ((t) => (t ? `${s.qty}; ${t.n} ${t.unit === 'each' ? t.word || 'each' : t.unit} in total` : s.qty))(totalOf(s)), area: s.area, daysLeft: daysLeft(s), status: s.status }));
+    const stockForAi = stockView.map((s) => ({ name: s.name, qty: ((t) => (t ? `${s.qty}; ${t.n} ${t.unit === 'each' ? t.word || 'each' : t.unit} in total` : s.qty))(totalOf(s)), area: s.area, daysLeft: daysLeft(s), status: s.status }));
     const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
     const weekend = now.getDay() === 0 || now.getDay() === 6;
     return {
@@ -362,7 +400,7 @@ export default function App() {
       dietary: profile.dietary,
       context: `It's ${day}${weekend ? ' (weekend)' : ''}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}.`,
     };
-  }, [stock, kit, profile, mealKey, mode, now]);
+  }, [stockView, kit, profile, mealKey, mode, now]);
 
   // Fill in one idea's full recipe (ingredients, steps) in the background.
   const loadRecipe = useCallback((key, i, card, base) => {
@@ -552,7 +590,10 @@ export default function App() {
         <Home
           mealKey={mealKey}
           dateText={dateLine(now)}
-          stock={stock}
+          stock={stockView}
+          checkItems={checkItems}
+          onCheck={answerCheck}
+          onCheckDone={() => setLastCheck(Date.now())}
           ideas={ideaList}
           ideaState={ideaState}
           ideaError={ideaError}
@@ -586,9 +627,10 @@ export default function App() {
 
       {current === 'kitchen' && (
         <Kitchen
-          stock={stock}
+          stock={stockView}
           banner={banner}
-          onEdit={(it) => setEditing({ item: it, isKit: false })}
+          binned={binnedThisMonth}
+          onEdit={(it) => setEditing({ item: stock.find((x) => x.id === it.id) || it, isKit: false })}
           onDelete={(it) => swipeDelete(it, false)}
           undo={undo && !undo.isProduct ? undo : null}
           onUndo={undoDelete}
@@ -612,7 +654,7 @@ export default function App() {
         <Shop
           list={shopList}
           setList={setShopList}
-          stock={[...stock, ...products]}
+          stock={[...stockView, ...products]}
           shop={shopById(profile.supermarket)}
           onAdd={(things, why, opts) => addToList(things, why, { quiet: true, ...opts })}
           onFindOptions={findShopOptions}
@@ -685,6 +727,10 @@ export default function App() {
           isKit={editing.isKit}
           isProduct={!!editing.isProduct}
           onClose={() => setEditing(null)}
+          onFinish={editing.isKit ? null : (how) => {
+            finishItem(editing.item, how, !!editing.isProduct);
+            setEditing(null);
+          }}
           onRemove={(id) => {
             if (editing.isKit) setKit((k) => k.filter((x) => x.id !== id));
             else if (editing.isProduct) setProducts((p) => p.filter((x) => x.id !== id));
@@ -694,7 +740,7 @@ export default function App() {
           onSave={(item) => {
             if (editing.isKit) setKit((k) => k.map((x) => (x.id === item.id ? item : x)));
             else if (editing.isProduct) setProducts((p) => p.map((x) => (x.id === item.id ? item : x)));
-            else setStock((s) => s.map((x) => (x.id === item.id ? item : x)));
+            else setStock((s) => s.map((x) => (x.id === item.id ? { ...item, countedAt: Date.now() } : x)));
             setEditing(null);
           }}
         />

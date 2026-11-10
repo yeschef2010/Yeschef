@@ -366,3 +366,11 @@ a.btn, a.btn:visited { color: #fff; }
 .ask .input { flex: 1; min-width: 0; }
 .ask-chip { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--sage); color: var(--forest); border-radius: 12px; padding: 6px 6px 6px 12px; font-size: 14.5px; }
 .ask-chip button { width: 32px; height: 32px; border-radius: 16px; border: none; background: rgba(255,255,255,0.6); color: var(--forest); display: flex; align-items: center; justify-content: center; }
+
+.btn.ghost.bin { color: var(--tomato); border-color: #F2B8AE; }
+.still-got { gap: 8px; }
+.still-row { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.still-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.still-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.still-btns button { height: 34px; padding: 0 10px; border-radius: 17px; border: 1.5px solid var(--line-2); background: var(--card); color: var(--forest); font-weight: 800; font-size: 13px; }
+.still-btns button.gone { color: var(--tomato); border-color: #F2B8AE; }
